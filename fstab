@@ -1,0 +1,9 @@
+﻿proc            /proc           proc    defaults          0       0
+PARTUUID=0e118a6f-01  /boot           vfat    defaults          0       2
+PARTUUID=0e118a6f-02  /               ext4    defaults,noatime  0       1
+# a swapfile is not a swap partition, no line here
+#   use  dphys-swapfile swap[on|off]  for that
+/dev/sdb1	/media/discoduro	ext4	defaults	0	0
+/dev/sdc1	/media/WDElements	ext4	defaults	0	0
+/dev/sda1	/media/Backup		ext4	defaults	0	0
+

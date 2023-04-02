@@ -1,0 +1,5 @@
+﻿sudo chmod -R 777 /media/discoduro/torrents;sudo chmod -R 777 /media/WDElements/Peliculas;sudo chmod -R 777 "/media/WDElements/Series TV";sudo chown -R -c pi /media/discoduro/torrents;sudo chown -R -c pi /media/WDElements/Peliculas;sudo chown -R -c pi "/media/WDElements/Series TV";sudo chmod -R 777 "/media/WDElements/Libros/Biblioteca de Calibre";
+rsync --progress -avzh /media/WDElements/Fotos /media/Backup;rsync --progress -avzh "/media/WDElements/Libros/Biblioteca de Calibre" /media/Backup;rsync --progress -avzh /media/WDElements/Tebeos /media/Backup;
+
+sudo chmod -R 777 "/media/WDElements/Libros/Biblioteca de Calibre"
+
