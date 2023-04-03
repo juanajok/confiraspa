@@ -21,7 +21,13 @@ actualizar_raspi() {
 configurar_ip_estatica() {
     echo "2) Configurando IP estática..."
     sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.old
-    sudo cp dhcpcd.conf /etc/dhcpcd.conf
+
+    new_ip_config="interface eth0
+static ip_address=192.168.1.76/24
+static routers=192.168.1.1
+static domain_name_servers=192.168.1.1"
+
+    echo "$new_ip_config" | sudo tee -a /etc/dhcpcd.conf > /dev/null
 }
 
 # Crea puntos de montaje
@@ -29,7 +35,6 @@ crear_puntos_de_montaje() {
     echo "3) Creando puntos de montaje..."
     sudo mkdir -p /media/discoduro && sudo chmod -R 777 /media/discoduro && sudo mkdir -p /media/Backup && sudo chmod -R 777 /media/Backup && sudo mkdir -p /media/WDElements && sudo chmod -R 777 /media/WDElements
 }
-
 
 generate_fstab() {
   # Leer la información de configuración desde el archivo JSON
@@ -45,33 +50,17 @@ generate_fstab() {
   echo "backup_part: $backup_part"
   echo "wdelements_part: $wdelements_part"
 
-  # Resto del código de la función generate_fstab()
-  # ...
-}
+  # Hacer una copia de seguridad del archivo /etc/fstab
+  sudo cp /etc/fstab /etc/fstab.backup
 
-
-  # Crear el contenido del nuevo archivo /etc/fstab
-  new_fstab_content="proc            /proc           proc    defaults          0       0
-PARTUUID=24c53124-01  /boot           vfat    defaults          0       2
-PARTUUID=24c53124-02  /               ext4    defaults,noatime  0       1
-# a swapfile is not a swap partition, no line here
-#   use  dphys-swapfile swap[on|off]  for that
-/dev/$discoduro_part  /media/discoduro        ext4    defaults        0       0
+  # Añadir las nuevas entradas al archivo /etc/fstab
+  new_entries="/dev/$discoduro_part  /media/discoduro        ext4    defaults        0       0
 /dev/$wdelements_part  /media/WDElements       ext4    defaults        0       0
 /dev/$backup_part      /media/Backup           ext4    defaults        0       0"
 
-  # Crear una copia de seguridad del archivo fstab actual
-  sudo cp /etc/fstab /etc/fstab.backup
-
-  # Escribir el nuevo contenido en /etc/fstab
-  echo "$new_fstab_content" | sudo tee /etc/fstab
-
-  # Montar todas las particiones según el nuevo archivo /etc/fstab
-  sudo mount -a
-
-  # Mostrar el contenido del nuevo archivo /etc/fstab
-  cat /etc/fstab
+  echo "$new_entries" | sudo tee -a /etc/fstab > /dev/null
 }
+
 
 
 instalar_samba() {
