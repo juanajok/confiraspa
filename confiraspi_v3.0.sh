@@ -20,25 +20,35 @@ actualizar_raspi() {
 
 configurar_ip_estatica() {
     echo "2) Configurando IP estática..."
-    sudo mv /etc/dhcpcd.conf /etc/dhcpcd.conf.old
+    sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.old
     sudo cp dhcpcd.conf /etc/dhcpcd.conf
 }
 
 # Crea puntos de montaje
 crear_puntos_de_montaje() {
     echo "3) Creando puntos de montaje..."
-    sudo mkdir -p /media/{discoduro,Backup,WDElements}
-    sudo chmod -R 777 /media/{discoduro,Backup,WDElements}
+    sudo mkdir -p /media/discoduro && sudo chmod -R 777 /media/discoduro && sudo mkdir -p /media/Backup && sudo chmod -R 777 /media/Backup && sudo mkdir -p /media/WDElements && sudo chmod -R 777 /media/WDElements
+}
 
 
 generate_fstab() {
-  # Obtener información de los dispositivos
-  devices_info=$(lsblk -o NAME,FSTYPE,SIZE -b -n -P)
+  # Leer la información de configuración desde el archivo JSON
+  config=$(cat partitions_config.json)
 
-  # Encontrar las particiones correctas
-  discoduro_part=$(echo "$devices_info" | awk -v min=1300000000000 -v max=1500000000000 '$3 >= min && $3 <= max {print $1}')
-  backup_part=$(echo "$devices_info" | awk -v min=367000000000 -v max=407000000000 '$3 >= min && $3 <= max {print $1}')
-  wdelements_part=$(echo "$devices_info" | awk -v min=3000000000000 -v max=4000000000000 '$3 >= min && $3 <= max {print $1}')
+  # Asignar valores a las variables de particiones
+  discoduro_part=$(echo "$config" | jq -r '.discoduro_part')
+  backup_part=$(echo "$config" | jq -r '.backup_part')
+  wdelements_part=$(echo "$config" | jq -r '.wdelements_part')
+
+  # Imprimir los valores de las variables de particiones
+  echo "discoduro_part: $discoduro_part"
+  echo "backup_part: $backup_part"
+  echo "wdelements_part: $wdelements_part"
+
+  # Resto del código de la función generate_fstab()
+  # ...
+}
+
 
   # Crear el contenido del nuevo archivo /etc/fstab
   new_fstab_content="proc            /proc           proc    defaults          0       0
@@ -63,10 +73,11 @@ PARTUUID=24c53124-02  /               ext4    defaults,noatime  0       1
   cat /etc/fstab
 }
 
+
 instalar_samba() {
     echo "6) Instalando Samba..."
     sudo apt install -y samba samba-common-bin
-    sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.old
+    sudo cp /etc/samba/smb.conf /etc/samba/smb.conf.old
     sudo cp smb.conf /etc/samba/smb.conf
     sudo systemctl restart smbd
 }
@@ -80,16 +91,16 @@ instalar_transmission() {
     echo "8) Instalando Transmission..."
     sudo apt-get install -y transmission-daemon
     sudo /etc/init.d/transmission-daemon stop
-    sudo mv /var/lib/transmission-daemon/info/settings.json /var/lib/transmission-daemon/info/settings.json.old
+    sudo cp /var/lib/transmission-daemon/info/settings.json /var/lib/transmission-daemon/info/settings.json.old
     sudo cp settings.json /var/lib/transmission-daemon/info/settings.json
     sudo /etc/init.d/transmission-daemon start
 }
 
 instalar_mono() {
     echo "9) Instalando Mono..."
-    sudo apt install apt-transport-https dirmngr -y
+    sudo apt install apt-transport-https dirmngr gnupg ca-certificates
     sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-    echo "deb https://download.mono-project.com/repo/debian stable-raspbianstretch main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
+    echo "deb https://download.mono-project.com/repo/debian stable-buster main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
     sudo apt update
     sudo apt install mono-devel -y
 }
@@ -102,15 +113,6 @@ instalar_sonarr() {
     sudo apt install sonarr
 }
 
-ejecutar_arrinstal() {
-    echo "Ejecutando el script Arrinstal.sh..."
-    if [ -f Arrinstal.sh ]; then
-        sh Arrinstal.sh
-    else
-        echo "No se encontró el archivo Arrinstal.sh en el directorio actual. Asegúrate de que esté presente y vuelve a intentarlo."
-        exit 1
-    fi
-}
 
 instalar_webmin() {
     # Descargar el script setup-repos.sh de Webmin
@@ -141,4 +143,3 @@ instalar_transmission
 instalar_mono
 instalar_sonarr
 instalar_webmin
-ejecutar_arrinstal.sh
