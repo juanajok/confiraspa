@@ -1,0 +1,5 @@
+{
+    "discoduro_part": "sda2",
+    "backup_part": "sda1",
+    "wdelements_part": "sdb1"
+  }
