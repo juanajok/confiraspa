@@ -16,18 +16,30 @@
 actualizar_raspi() {
     echo "1) Actualizando la Raspberry Pi..."
     sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt clean
+    #instalo jq para tratar ficheros json
+    sudo apt-get install jq
 }
 
 configurar_ip_estatica() {
-    echo "2) Configurando IP estática..."
-    sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.old
+  echo "2) Configurando IP estática..."
 
-    new_ip_config="interface eth0
-static ip_address=192.168.1.76/24
-static routers=192.168.1.1
-static domain_name_servers=192.168.1.1"
+  # Leer la información de configuración desde el archivo JSON
+  config=$(cat ip_config.json)
 
-    echo "$new_ip_config" | sudo tee -a /etc/dhcpcd.conf > /dev/null
+  # Asignar valores a las variables de configuración de IP
+  interface=$(echo "$config" | jq -r '.interface')
+  ip_address=$(echo "$config" | jq -r '.ip_address')
+  routers=$(echo "$config" | jq -r '.routers')
+  domain_name_servers=$(echo "$config" | jq -r '.domain_name_servers')
+
+  # Hacer una copia de seguridad del archivo /etc/dhcpcd.conf
+  sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.old
+
+  # Añadir la información de IP estática al final del archivo /etc/dhcpcd.conf
+  echo "interface $interface" | sudo tee -a /etc/dhcpcd.conf
+  echo "static ip_address=$ip_address" | sudo tee -a /etc/dhcpcd.conf
+  echo "static routers=$routers" | sudo tee -a /etc/dhcpcd.conf
+  echo "static domain_name_servers=$domain_name_servers" | sudo tee -a /etc/dhcpcd.conf
 }
 
 # Crea puntos de montaje
@@ -60,7 +72,6 @@ generate_fstab() {
 
   echo "$new_entries" | sudo tee -a /etc/fstab > /dev/null
 }
-
 
 
 instalar_samba() {
