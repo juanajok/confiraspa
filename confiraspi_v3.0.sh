@@ -17,7 +17,7 @@ actualizar_raspi() {
     echo "1) Actualizando la Raspberry Pi..."
     sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt clean
     #instalo jq para tratar ficheros json
-    sudo apt-get install jq
+    sudo apt-get install jq -y
 }
 
 configurar_ip_estatica() {
@@ -49,29 +49,36 @@ crear_puntos_de_montaje() {
 }
 
 generate_fstab() {
-  # Leer la información de configuración desde el archivo JSON
-  config=$(cat partitions_config.json)
+  # Asignamos las particiones
+  particiones=$(lsblk -ln -o NAME,SIZE,TYPE,FSTYPE | grep -w 'part' | grep '^sd')
+  sorted_partitions=$(echo "$particiones" | sort -k2 -h)
 
-  # Asignar valores a las variables de particiones
-  discoduro_part=$(echo "$config" | jq -r '.discoduro_part')
-  backup_part=$(echo "$config" | jq -r '.backup_part')
-  wdelements_part=$(echo "$config" | jq -r '.wdelements_part')
+  discoduro_part=$(echo "$sorted_partitions" | head -n 1 | awk '{print $1}')
+  discoduro_fstype=$(echo "$sorted_partitions" | head -n 1 | awk '{print $4}')
+  backup_part=$(echo "$sorted_partitions" | tail -n 2 | head -n 1 | awk '{print $1}')
+  backup_fstype=$(echo "$sorted_partitions" | tail -n 2 | head -n 1 | awk '{print $4}')
+  wdelements_part=$(echo "$sorted_partitions" | tail -n 1 | awk '{print $1}')
+  wdelements_fstype=$(echo "$sorted_partitions" | tail -n 1 | awk '{print $4}')
 
   # Imprimir los valores de las variables de particiones
   echo "discoduro_part: $discoduro_part"
+  echo "discoduro_fstype: $discoduro_fstype"
   echo "backup_part: $backup_part"
+  echo "backup_fstype: $backup_fstype"
   echo "wdelements_part: $wdelements_part"
+  echo "wdelements_fstype: $wdelements_fstype"
 
   # Hacer una copia de seguridad del archivo /etc/fstab
   sudo cp /etc/fstab /etc/fstab.backup
 
   # Añadir las nuevas entradas al archivo /etc/fstab
-  new_entries="/dev/$discoduro_part  /media/discoduro        ext4    defaults        0       0
-/dev/$wdelements_part  /media/WDElements       ext4    defaults        0       0
-/dev/$backup_part      /media/Backup           ext4    defaults        0       0"
+  new_entries="/dev/$discoduro_part  /media/discoduro        $discoduro_fstype    defaults        0       0
+/dev/$wdelements_part  /media/WDElements       $wdelements_fstype    defaults        0       0
+/dev/$backup_part      /media/Backup           $backup_fstype    defaults        0       0"
 
   echo "$new_entries" | sudo tee -a /etc/fstab > /dev/null
 }
+
 
 
 instalar_samba() {
@@ -131,15 +138,18 @@ instalar_webmin() {
     echo "Webmin instalado correctamente. Acceda a la interfaz de Webmin en https://[tu-ip]:10000"
 }
 
+main() {
+    # Llamadas a las funciones
+    actualizar_raspi
+    configurar_ip_estatica
+    crear_puntos_de_montaje
+    generate_fstab
+    instalar_samba
+    instalar_xrdp
+    instalar_transmission
+    instalar_mono
+    instalar_sonarr
+    instalar_webmin
+}
 
-# Llamadas a las funciones
-actualizar_raspi
-configurar_ip_estatica
-crear_puntos_de_montaje
-generate_fstab
-instalar_samba
-instalar_xrdp
-instalar_transmission
-instalar_mono
-instalar_sonarr
-instalar_webmin
+main
