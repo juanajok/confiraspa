@@ -80,6 +80,7 @@ generate_fstab() {
 }
 
 
+
 instalar_samba() {
     echo "6) Instalando Samba..."
     sudo apt install -y samba samba-common-bin
@@ -137,6 +138,7 @@ instalar_webmin() {
     echo "Webmin instalado correctamente. Acceda a la interfaz de Webmin en https://[tu-ip]:10000"
 }
 
+
 hablilitar_vnc(){
     # Habilitar el servidor VNC para que se ejecute al inicio
 sudo systemctl enable vncserver-x11-serviced.service
@@ -149,15 +151,20 @@ sudo systemctl status vncserver-x11-serviced.service
 }
 
 
-# Llamadas a las funciones
-actualizar_raspi
-configurar_ip_estatica
-crear_puntos_de_montaje
-generate_fstab
-instalar_samba
-instalar_xrdp
-instalar_transmission
-instalar_mono
-instalar_sonarr
-instalar_webmin
-hablilitar_vnc
+main() {
+    # Llamadas a las funciones
+    actualizar_raspi
+    configurar_ip_estatica
+    crear_puntos_de_montaje
+    generate_fstab
+    instalar_samba
+    instalar_xrdp
+    instalar_transmission
+    instalar_mono
+    instalar_sonarr
+    instalar_webmin
+    hablilitar_vnc
+}
+
+main
+
