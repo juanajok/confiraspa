@@ -138,6 +138,19 @@ instalar_webmin() {
     echo "Webmin instalado correctamente. Acceda a la interfaz de Webmin en https://[tu-ip]:10000"
 }
 
+
+hablilitar_vnc(){
+    # Habilitar el servidor VNC para que se ejecute al inicio
+sudo systemctl enable vncserver-x11-serviced.service
+
+# Iniciar el servidor VNC
+sudo systemctl start vncserver-x11-serviced.service
+
+# Mostrar el estado del servicio VNC para verificar que se ha iniciado correctamente
+sudo systemctl status vncserver-x11-serviced.service
+}
+
+
 main() {
     # Llamadas a las funciones
     actualizar_raspi
@@ -150,6 +163,8 @@ main() {
     instalar_mono
     instalar_sonarr
     instalar_webmin
+    hablilitar_vnc
 }
 
 main
+
