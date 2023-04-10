@@ -79,8 +79,6 @@ generate_fstab() {
   echo "$new_entries" | sudo tee -a /etc/fstab > /dev/null
 }
 
-
-
 instalar_samba() {
     echo "6) Instalando Samba..."
     sudo apt install -y samba samba-common-bin
@@ -149,7 +147,6 @@ sudo systemctl start vncserver-x11-serviced.service
 # Mostrar el estado del servicio VNC para verificar que se ha iniciado correctamente
 sudo systemctl status vncserver-x11-serviced.service
 }
-
 
 main() {
     # Llamadas a las funciones
