@@ -137,7 +137,7 @@ instalar_webmin() {
 }
 
 
-hablilitar_vnc(){
+habilitar_vnc(){
     # Habilitar el servidor VNC para que se ejecute al inicio
 sudo systemctl enable vncserver-x11-serviced.service
 
@@ -171,7 +171,7 @@ main() {
     instalar_mono
     instalar_sonarr
     instalar_webmin
-    hablilitar_vnc
+    habilitar_vnc
 }
 
 main
