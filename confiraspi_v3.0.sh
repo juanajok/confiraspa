@@ -146,6 +146,17 @@ sudo systemctl start vncserver-x11-serviced.service
 
 # Mostrar el estado del servicio VNC para verificar que se ha iniciado correctamente
 sudo systemctl status vncserver-x11-serviced.service
+
+# Hacer una copia de seguridad del archivo /boot/config.txt
+sudo cp /boot/config.txt /boot/config.txt.backup
+
+# Eliminar las líneas que contienen hdmi_group y hdmi_mode si ya existen
+sudo sed -i '/^hdmi_group=/d' /boot/config.txt
+sudo sed -i '/^hdmi_mode=/d' /boot/config.txt
+
+# Añadir las líneas al final del archivo /boot/config.txt para establecer la resolución de pantalla a 1280x720
+echo "hdmi_group=2" | sudo tee -a /boot/config.txt
+echo "hdmi_mode=85" | sudo tee -a /boot/config.txt
 }
 
 main() {
