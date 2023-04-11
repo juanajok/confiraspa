@@ -159,6 +159,53 @@ echo "hdmi_group=2" | sudo tee -a /boot/config.txt
 echo "hdmi_mode=85" | sudo tee -a /boot/config.txt
 }
 
+instalar_amule() {
+
+# Instalar aMule y herramientas necesarias
+sudo apt-get update
+sudo apt-get install -y amule amule-utils amule-daemon
+sudo apt-get install amule-web
+
+sudo cp /home/pi/.aMule/amule.conf /home/pi/.aMule/amule.conf.backup
+
+# Rutas de directorios desde archivo JSON
+directories_json="amule_directories.json"
+incoming_directory=$(jq -r '.incoming_directory' "$directories_json")
+temp_directory=$(jq -r '.temp_directory' "$directories_json")
+
+# Cambiar rutas de directorios en amule.conf
+amule_conf_path="/home/pi/.aMule/amule.conf"
+sudo sed -i "s|^IncomingDir=.*$|IncomingDir=$incoming_directory|" "$amule_conf_path"
+sudo sed -i "s|^TempDir=.*$|TempDir=$temp_directory|" "$amule_conf_path"
+sudo sed -i "s|^Template=.*$|Template=webserver|" "$amule_conf_path"
+sudo sed -i "s|^Password=.*$|Password=$(echo -n raspberry | md5sum | awk '{ print $1 }')|" "$amule_conf_path"
+sudo sed -i "s|^User=.*$|User=pi|" "$amule_conf_path"
+
+# Configurar aMule para que se ejecute al iniciar la Raspberry Pi
+sudo bash -c "cat > /etc/systemd/system/amule.service << EOL
+[Unit]
+Description=aMule Daemon
+After=network.target
+
+[Service]
+User=pi
+Type=forking
+ExecStart=/usr/bin/amuled -f
+ExecStartPost=/bin/sleep 10 && /usr/bin/amuleweb --amule-config-file=/home/pi/.aMule/amule.conf
+ExecStop=/usr/bin/pkill -f amuled
+ExecStopPost=/usr/bin/pkill -f amuleweb
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOL"
+
+# reinicia el servicio para que coja los cambios
+sudo systemctl daemon-reload
+sudo systemctl enable amule.service
+sudo systemctl restart amule.service
+
+}
 main() {
     # Llamadas a las funciones
     actualizar_raspi
@@ -172,6 +219,7 @@ main() {
     instalar_sonarr
     instalar_webmin
     habilitar_vnc
+    instalar_amule
 }
 
 main
