@@ -206,6 +206,24 @@ sudo systemctl enable amule.service
 sudo systemctl restart amule.service
 
 }
+
+instalar_plex(){
+    # Actualiza el sistema
+sudo apt-get update -y
+sudo apt-get upgrade -y
+
+# Descarga e instala Plex Media Server
+wget -O plex.deb https://downloads.plex.tv/plex-media-server-new/1.32.0.6918-6f393eda1/debian/plexmediaserver_1.32.0.6918-6f393eda1_armhf.deb?_gl=1*jybto6*_ga*MjY4NzExODIyLjE2ODE0MjY2NzI.*_ga_G6FQWNSENB*MTY4MTQyNjY3Mi4xLjEuMTY4MTQyNjkyMy4wLjAuMA..
+
+sudo dpkg -i plex.deb
+
+# Habilita e inicia Plex Media Server
+sudo systemctl enable plexmediaserver.service
+sudo systemctl start plexmediaserver.service
+
+# Muestra la dirección IP del Raspberry Pi
+echo "Plex Media Server instalado. Visita http://$(hostname -I | awk '{print $1}'):32400/web para configurarlo."
+}
 main() {
     # Llamadas a las funciones
     actualizar_raspi
@@ -219,7 +237,9 @@ main() {
     instalar_sonarr
     instalar_webmin
     habilitar_vnc
-    instalar_amule
+    #instalar_amule
+    instalar_plex
+
 }
 
 main
