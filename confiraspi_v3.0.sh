@@ -224,6 +224,61 @@ sudo systemctl start plexmediaserver.service
 # Muestra la dirección IP del Raspberry Pi
 echo "Plex Media Server instalado. Visita http://$(hostname -I | awk '{print $1}'):32400/web para configurarlo."
 }
+
+instalar_bazarr(){
+
+# Instalar dependencias
+sudo apt install -y python3 python3-pip python3-venv libffi-dev zlib1g-dev libicu-dev libxml2-dev libxslt1-dev g++ git
+
+# Crear la carpeta de Bazarr
+mkdir -p /home/pi/bazarr
+
+# Clonar el repositorio de Bazarr en la carpeta
+git clone https://github.com/morpheus65535/bazarr.git /home/pi/bazarr
+
+# Navegar a la carpeta de Bazarr
+cd /home/pi/bazarr
+
+# Crear el entorno virtual de Python
+python3 -m venv venv
+
+# Activar el entorno virtual
+source venv/bin/activate
+
+# Instalar las dependencias de Bazarr
+pip install -r requirements.txt
+
+# Desactivar el entorno virtual
+deactivate
+
+# Crear el servicio de Bazarr
+sudo bash -c "cat > /etc/systemd/system/bazarr.service << EOL
+[Unit]
+Description=Bazarr Daemon
+After=syslog.target network.target
+
+[Service]
+User=pi
+Group=pi
+UMask=002
+Type=simple
+ExecStart=/home/pi/bazarr/venv/bin/python3 /home/pi/bazarr/bazarr.py
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
+EOL"
+
+# Habilitar y iniciar el servicio de Bazarr
+sudo systemctl enable bazarr.service
+sudo systemctl start bazarr.service
+
+# Mostrar mensaje final
+echo "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
+}
+
+
 main() {
     # Llamadas a las funciones
     actualizar_raspi
@@ -239,6 +294,7 @@ main() {
     habilitar_vnc
     #instalar_amule
     instalar_plex
+    instalar_bazarr
 
 }
 
