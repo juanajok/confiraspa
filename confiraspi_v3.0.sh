@@ -161,11 +161,18 @@ echo "hdmi_mode=85" | sudo tee -a /boot/config.txt
 
 instalar_amule() {
 
-# Instalar aMule y herramientas necesarias
+# Instalar aMule, herramientas necesarias e interfaz gráfica
 sudo apt-get update
-sudo apt-get install -y amule amule-utils amule-daemon
-sudo apt-get install amule-web
+sudo apt-get install -y amule amule-utils amule-daemon amule-utils-gui
 
+# Iniciar el demonio de aMule para generar el archivo de configuración
+sudo amuled
+
+# Detener el demonio de aMule
+sleep 5
+sudo pkill -f amuled
+
+# copia de seguridad de amule.conf
 sudo cp /home/pi/.aMule/amule.conf /home/pi/.aMule/amule.conf.backup
 
 # Rutas de directorios desde archivo JSON
@@ -191,19 +198,34 @@ After=network.target
 User=pi
 Type=forking
 ExecStart=/usr/bin/amuled -f
-ExecStartPost=/bin/sleep 10 && /usr/bin/amuleweb --amule-config-file=/home/pi/.aMule/amule.conf
 ExecStop=/usr/bin/pkill -f amuled
-ExecStopPost=/usr/bin/pkill -f amuleweb
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 EOL"
 
+# Configurar aMule GUI para que se ejecute al iniciar la Raspberry Pi
+sudo bash -c "cat > /etc/systemd/system/amule-gui.service << EOL
+[Unit]
+Description=aMule GUI
+After=amule.service
+
+[Service]
+User=pi
+Type=simple
+ExecStart=/usr/bin/amule
+
+[Install]
+WantedBy=graphical.target
+EOL"    
+
 # reinicia el servicio para que coja los cambios
 sudo systemctl daemon-reload
 sudo systemctl enable amule.service
+sudo systemctl enable amule-gui.service
 sudo systemctl restart amule.service
+sudo systemctl restart amule-gui.service
 
 }
 
@@ -292,10 +314,9 @@ main() {
     instalar_sonarr
     instalar_webmin
     habilitar_vnc
-    #instalar_amule
     instalar_plex
     instalar_bazarr
-
+    instalar_amule
 }
 
 main
