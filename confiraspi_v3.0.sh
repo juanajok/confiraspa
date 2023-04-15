@@ -11,7 +11,24 @@
 #   settings.json
 #   smb.conf
 # Dependencies: No tiene
-# Notes: NOTAS_ADICIONALES (si corresponde)
+# Notes: Este script tiene como objetivo configurar una Raspberry Pi con varios servicios y programas, como Samba, XRDP, Transmission, Mono, Sonarr, Webmin, VNC, Plex, Bazarr y aMule. A continuación, se describen brevemente las funciones principales de cada uno de estos servicios y programas:
+
+#Samba: Permite compartir archivos y directorios a través de una red local.
+#XRDP: Habilita el acceso remoto al escritorio de la Raspberry Pi.
+#Transmission: Cliente de torrent para descargar y compartir archivos.
+#Mono: Entorno de desarrollo para ejecutar aplicaciones basadas en .NET.
+#Sonarr: Gestiona automáticamente tus series de TV y descarga nuevos episodios.
+#Webmin: Herramienta de administración de sistemas basada en web para Linux.
+#VNC: Permite el control remoto gráfico de una Raspberry Pi.
+#Plex: Servidor de medios para organizar y transmitir películas, series de TV y música.
+#Bazarr: Permite la descarga automática de subtítulos para tus series y películas.
+#aMule: Cliente P2P para compartir archivos a través de la red eD2k y Kademlia.
+
+leer_credenciales() {
+    credenciales=$(cat credenciales.json)
+    usuario=$(echo "$credenciales" | jq -r '.user')
+    contrasena=$(echo "$credenciales" | jq -r '.password')
+}
 
 actualizar_raspi() {
     echo "1) Actualizando la Raspberry Pi..."
@@ -173,7 +190,7 @@ sleep 5
 sudo pkill -f amuled
 
 # copia de seguridad de amule.conf
-sudo cp /home/pi/.aMule/amule.conf /home/pi/.aMule/amule.conf.backup
+sudo cp /home/$usuario/.aMule/amule.conf /home/$usuario/.aMule/amule.conf.backup
 
 # Rutas de directorios desde archivo JSON
 directories_json="amule_directories.json"
@@ -181,11 +198,11 @@ incoming_directory=$(jq -r '.incoming_directory' "$directories_json")
 temp_directory=$(jq -r '.temp_directory' "$directories_json")
 
 # Cambiar rutas de directorios en amule.conf
-amule_conf_path="/home/pi/.aMule/amule.conf"
+amule_conf_path="/home/$usuario/.aMule/amule.conf"
 sudo sed -i "s|^IncomingDir=.*$|IncomingDir=$incoming_directory|" "$amule_conf_path"
 sudo sed -i "s|^TempDir=.*$|TempDir=$temp_directory|" "$amule_conf_path"
 sudo sed -i "s|^Template=.*$|Template=webserver|" "$amule_conf_path"
-sudo sed -i "s|^Password=.*$|Password=$(echo -n raspberry | md5sum | awk '{ print $1 }')|" "$amule_conf_path"
+sudo sed -i "s|^Password=.*$|Password=$(echo -n $contrasena | md5sum | awk '{ print $1 }')|" "$amule_conf_path"
 sudo sed -i "s|^User=.*$|User=pi|" "$amule_conf_path"
 
 # Configurar aMule para que se ejecute al iniciar la Raspberry Pi
@@ -253,13 +270,13 @@ instalar_bazarr(){
 sudo apt install -y python3 python3-pip python3-venv libffi-dev zlib1g-dev libicu-dev libxml2-dev libxslt1-dev g++ git
 
 # Crear la carpeta de Bazarr
-mkdir -p /home/pi/bazarr
+mkdir -p /home/$usuario/bazarr
 
 # Clonar el repositorio de Bazarr en la carpeta
-git clone https://github.com/morpheus65535/bazarr.git /home/pi/bazarr
+git clone https://github.com/morpheus65535/bazarr.git /home/$usuario/bazarr
 
 # Navegar a la carpeta de Bazarr
-cd /home/pi/bazarr
+cd /home/$usuario/bazarr
 
 # Crear el entorno virtual de Python
 python3 -m venv venv
@@ -284,7 +301,7 @@ User=pi
 Group=pi
 UMask=002
 Type=simple
-ExecStart=/home/pi/bazarr/venv/bin/python3 /home/pi/bazarr/bazarr.py
+ExecStart=/home/$usuario/bazarr/venv/bin/python3 /home/$usuario/bazarr/bazarr.py
 Restart=always
 RestartSec=15
 
@@ -304,6 +321,7 @@ echo "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
 main() {
     # Llamadas a las funciones
     actualizar_raspi
+    leer_credenciales
     configurar_ip_estatica
     crear_puntos_de_montaje
     generate_fstab
