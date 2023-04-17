@@ -13,6 +13,7 @@
 # Autor: Juan José Hipólito
 # Fecha: 17/04/2023
 # Versión: 1.0
+
 SCRIPT_DIR="$(dirname "$0")"
 CONFIG_FILE="$SCRIPT_DIR/change_permissions_config.json"
 
@@ -25,12 +26,12 @@ echo "Directorios:"
 echo "$directorios"
 
 # Aplicar chown y chmod a cada directorio
-for dir in $directorios; do
-    echo "Cambiando la propiedad del directorio $dir al usuario $usuario"
+while IFS= read -r dir; do
+    echo "Cambiando la propiedad del directorio \"$dir\" al usuario $usuario"
     sudo chown -R $usuario "$dir"
     
-    echo "Cambiando permisos del directorio $dir a 777"
+    echo "Cambiando permisos del directorio \"$dir\" a 777"
     sudo chmod -R 777 "$dir"
-done
+done <<< "$directorios"
 
 echo "Permisos cambiados exitosamente."
