@@ -32,11 +32,10 @@ Ajuste los valores de interface, ip_address, routers y domain_name_servers segú
 
 Edita también el fichero credenciales.json:
 {
-    "user": "pi",
-    "password": "raspberry"
+       "password": "raspberry"
 }
 
-con el usuario y contraseña de tu raspberry pi. La aplicación aMule heredará las mismas credenciales
+La aplicación aMule heredará el usuario con que ejecutes el script y la contraseña de ese json. (Recomendable editar el json justo antes de la ejecución y borrarlo o modificarlo tras la misma.)
 Ejecute el script:
 
 ./confiraspi

@@ -25,8 +25,8 @@
 #aMule: Cliente P2P para compartir archivos a través de la red eD2k y Kademlia.
 
 leer_credenciales() {
+    usuario=$USER
     credenciales=$(cat credenciales.json)
-    usuario=$(echo "$credenciales" | jq -r '.user')
     contrasena=$(echo "$credenciales" | jq -r '.password')
 }
 
