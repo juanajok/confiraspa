@@ -212,7 +212,7 @@ Description=aMule Daemon
 After=network.target
 
 [Service]
-User=pi
+User=$usuario
 Type=forking
 ExecStart=/usr/bin/amuled -f
 ExecStop=/usr/bin/pkill -f amuled
@@ -229,7 +229,7 @@ Description=aMule GUI
 After=amule.service
 
 [Service]
-User=pi
+User=$usuario
 Type=simple
 ExecStart=/usr/bin/amule
 
@@ -297,8 +297,8 @@ Description=Bazarr Daemon
 After=syslog.target network.target
 
 [Service]
-User=pi
-Group=pi
+User=$usuario
+Group=$usuario
 UMask=002
 Type=simple
 ExecStart=/home/$usuario/bazarr/venv/bin/python3 /home/$usuario/bazarr/bazarr.py
