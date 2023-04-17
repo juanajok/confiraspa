@@ -120,7 +120,7 @@ instalar_transmission() {
 
 instalar_mono() {
     echo "9) Instalando Mono..."
-    sudo apt install apt-transport-https dirmngr gnupg ca-certificates
+    sudo apt install -y apt-transport-https dirmngr gnupg ca-certificates
     sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
     echo "deb https://download.mono-project.com/repo/debian stable-buster main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
     sudo apt update
@@ -132,7 +132,7 @@ instalar_sonarr() {
     sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 2009837CBFFD68F45BC180471F4F90DE2A9B4BF8
     echo "deb https://apt.sonarr.tv/debian buster main" | sudo tee /etc/apt/sources.list.d/sonarr.list
     sudo apt update
-    sudo apt install sonarr
+    sudo apt install -y sonarr
 }
 
 
