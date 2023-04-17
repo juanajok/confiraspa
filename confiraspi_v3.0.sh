@@ -211,7 +211,7 @@ instalar_amule() {
     sudo sed -i "s|^TempDir=.*$|TempDir=$temp_directory|" "$amule_conf_path"
     sudo sed -i "s|^Template=.*$|Template=webserver|" "$amule_conf_path"
     sudo sed -i "s|^Password=.*$|Password=$(echo -n $contrasena | md5sum | awk '{ print $1 }')|" "$amule_conf_path"
-sudo sed -i "s|^User=.*$|User=pi|" "$amule_conf_path"
+    sudo sed -i "s|^User=.*$|User=pi|" "$amule_conf_path"
 
 # Configurar aMule para que se ejecute al iniciar la Raspberry Pi
 sudo bash -c "cat > /etc/systemd/system/amule.service << EOL
@@ -251,7 +251,6 @@ EOL"
     sudo systemctl enable amule-gui.service
     sudo systemctl restart amule.service
     sudo systemctl restart amule-gui.service
-
 }
 
 instalar_plex(){
@@ -317,12 +316,12 @@ RestartSec=15
 WantedBy=multi-user.target
 EOL"
 
-# Habilitar y iniciar el servicio de Bazarr
-sudo systemctl enable bazarr.service
-sudo systemctl start bazarr.service
+    # Habilitar y iniciar el servicio de Bazarr
+    sudo systemctl enable bazarr.service
+    sudo systemctl start bazarr.service
 
-# Mostrar mensaje final
-echo "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
+    # Mostrar mensaje final
+    echo "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
 }
 
 comandos_crontab(){

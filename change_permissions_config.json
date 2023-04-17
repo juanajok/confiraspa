@@ -1,0 +1,9 @@
+{
+    "usuario": "pi",
+    "directorios": [
+      "/media/discoduro/torrents",
+      "/media/WDElements/Peliculas",
+      "/media/WDElements/Series TV",
+      "/media/WDElements/Libros/Biblioteca de Calibre"
+    ]
+  }

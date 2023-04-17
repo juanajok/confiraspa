@@ -1,0 +1,16 @@
+{
+  "directorios": [
+    {
+      "origen": "/media/WDElements/Fotos",
+      "destino": "/media/Backup"
+    },
+    {
+      "origen": "/media/WDElements/Libros/Biblioteca de Calibre",
+      "destino": "/media/Backup"
+    },
+    {
+      "origen": "/media/WDElements/Tebeos",
+      "destino": "/media/Backup"
+    }
+  ]
+}

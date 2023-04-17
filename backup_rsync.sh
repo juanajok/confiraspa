@@ -7,31 +7,30 @@
 # Date: 2023-03-30
 # License: GNU
 # Usage: Ejecuta el script manualmente o programa su ejecución en crontab
-# Dependencies: rsync
+# Dependencies: rsync y  jq (https://stedolan.github.io/jq/)
 # Notes: Asegúrate de que las rutas de origen y destino estén montadas antes de ejecutar este script
 
-# Rutas de origen y destino para la copia de seguridad
-declare -A backup_paths
-backup_paths=(
-  ["/media/WDElements/Fotos"]="/media/Backup/Fotos"
-  ["/media/WDElements/Libros/Biblioteca de Calibre"]="/media/Backup/Biblioteca de Calibre"
-  ["/media/WDElements/Tebeos"]="/media/Backup/Tebeos"
-)
+SCRIPT_DIR="$(dirname "$0")"
+CONFIG_FILE="$SCRIPT_DIR/backup_rsync_config.json"
 
-rsync_backup() {
-    echo "Iniciando copias de seguridad con rsync..."
+echo "Script directory: $SCRIPT_DIR"
+echo "Config file: $CONFIG_FILE"
 
-    for source in "${!backup_paths[@]}"; do
-        destination=${backup_paths[$source]}
-        echo "Copia de seguridad en curso: $source -> $destination"
-        rsync --progress -avzh "$source" "$destination"
-    done
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Config file not found"
+    exit 1
+fi
 
-    echo "Copias de seguridad completadas."
-}
+directorios=$(jq -c '.directorios[]' $CONFIG_FILE)
 
-main() {
-    rsync_backup
-}
+echo "Directorios:"
+echo "$directorios"
 
-main
+# Ejecutar rsync para cada par de directorios origen y destino
+echo "$directorios" | while read -r dir_info; do
+    origen=$(echo $dir_info | jq -r '.origen')
+    destino=$(echo $dir_info | jq -r '.destino')
+    echo "Origen: $origen"
+    echo "Destino: $destino"
+    rsync --progress -avzh "$origen" "$destino"
+done
