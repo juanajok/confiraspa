@@ -317,6 +317,30 @@ sudo systemctl start bazarr.service
 echo "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
 }
 
+comandos_crontab(){
+# Leemos el archivo JSON y almacenamos la información en un array
+scripts_and_crontab=$(jq -c '.[]' scripts_and_crontab.json)
+
+# Aplicar permisos ejecutables y agregar al crontab de root
+for entry in $scripts_and_crontab; do
+  script=$(echo "$entry" | jq -r '.script')
+  crontab_entry=$(echo "$entry" | jq -r '.crontab_entry')
+
+  # Aplicar permisos ejecutables
+  chmod +x "$script"
+  echo "Permisos ejecutables aplicados a: $script"
+
+  # Comprobar si el script ya está en el crontab de root
+  if sudo crontab -l | grep -q "$script"; then
+    echo "El script $script ya está en el crontab de root."
+  else
+    # Agregar el script al crontab de root
+    (sudo crontab -l 2>/dev/null; echo "$crontab_entry $script") | sudo crontab -
+    echo "Script $script agregado al crontab de root."
+  fi
+done
+}
+
 
 main() {
     # Llamadas a las funciones
@@ -335,6 +359,7 @@ main() {
     instalar_plex
     instalar_bazarr
     instalar_amule
+    comandos_crontab
 }
 
 main

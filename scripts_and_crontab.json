@@ -1,0 +1,10 @@
+[
+    {
+      "script": "/home/$usuario/confiraspa/change_permissions.sh",
+      "crontab_entry": "0 * * * *"
+    },
+    {
+      "script": "/home/$usuario/confiraspa/backup_rsync.sh",
+      "crontab_entry": "0 2 * * *"
+    }
+  ]
