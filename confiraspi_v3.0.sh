@@ -62,7 +62,15 @@ configurar_ip_estatica() {
 # Crea puntos de montaje
 crear_puntos_de_montaje() {
     echo "3) Creando puntos de montaje..."
-    sudo mkdir -p /media/discoduro && sudo chmod -R 777 /media/discoduro && sudo mkdir -p /media/Backup && sudo chmod -R 777 /media/Backup && sudo mkdir -p /media/WDElements && sudo chmod -R 777 /media/WDElements
+    # Leer directorios del archivo JSON
+    directorios=$(cat puntos_de_montaje.json | jq -r '.puntos_de_montaje | .[]')
+
+    # Crear directorios y aplicar permisos
+    for dir in "${directorios[@]}"; do
+        sudo mkdir -p "$dir"
+        sudo chmod -R 777 "$dir"
+        echo "Punto de montaje creado y permisos aplicados: $dir"
+    done
 }
 
 generate_fstab() {
@@ -340,7 +348,6 @@ for entry in $scripts_and_crontab; do
   fi
 done
 }
-
 
 main() {
     # Llamadas a las funciones
