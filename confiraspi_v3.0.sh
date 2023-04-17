@@ -164,53 +164,53 @@ instalar_webmin() {
 
 habilitar_vnc(){
     # Habilitar el servidor VNC para que se ejecute al inicio
-sudo systemctl enable vncserver-x11-serviced.service
+    sudo systemctl enable vncserver-x11-serviced.service
 
-# Iniciar el servidor VNC
-sudo systemctl start vncserver-x11-serviced.service
+    # Iniciar el servidor VNC
+    sudo systemctl start vncserver-x11-serviced.service
 
-# Mostrar el estado del servicio VNC para verificar que se ha iniciado correctamente
-sudo systemctl status vncserver-x11-serviced.service
+    # Mostrar el estado del servicio VNC para verificar que se ha iniciado correctamente
+    sudo systemctl status vncserver-x11-serviced.service
 
-# Hacer una copia de seguridad del archivo /boot/config.txt
-sudo cp /boot/config.txt /boot/config.txt.backup
+    # Hacer una copia de seguridad del archivo /boot/config.txt
+    sudo cp /boot/config.txt /boot/config.txt.backup
 
-# Eliminar las líneas que contienen hdmi_group y hdmi_mode si ya existen
-sudo sed -i '/^hdmi_group=/d' /boot/config.txt
-sudo sed -i '/^hdmi_mode=/d' /boot/config.txt
+    # Eliminar las líneas que contienen hdmi_group y hdmi_mode si ya existen
+    sudo sed -i '/^hdmi_group=/d' /boot/config.txt
+    sudo sed -i '/^hdmi_mode=/d' /boot/config.txt
 
-# Añadir las líneas al final del archivo /boot/config.txt para establecer la resolución de pantalla a 1280x720
-echo "hdmi_group=2" | sudo tee -a /boot/config.txt
-echo "hdmi_mode=85" | sudo tee -a /boot/config.txt
+    # Añadir las líneas al final del archivo /boot/config.txt para establecer la resolución de pantalla a 1280x720
+    echo "hdmi_group=2" | sudo tee -a /boot/config.txt
+    echo "hdmi_mode=85" | sudo tee -a /boot/config.txt
 }
 
 instalar_amule() {
 
-# Instalar aMule, herramientas necesarias e interfaz gráfica
-sudo apt-get update
-sudo apt-get install -y amule amule-utils amule-daemon amule-utils-gui
+    # Instalar aMule, herramientas necesarias e interfaz gráfica
+    sudo apt-get update
+    sudo apt-get install -y amule amule-utils amule-daemon amule-utils-gui
 
-# Iniciar el demonio de aMule para generar el archivo de configuración
-sudo amuled
+    # Iniciar el demonio de aMule para generar el archivo de configuración
+    sudo amuled
 
-# Detener el demonio de aMule
-sleep 5
-sudo pkill -f amuled
+    # Detener el demonio de aMule
+    sleep 5
+    sudo pkill -f amuled
 
-# copia de seguridad de amule.conf
-sudo cp /home/$usuario/.aMule/amule.conf /home/$usuario/.aMule/amule.conf.backup
+    # copia de seguridad de amule.conf
+    sudo cp /home/$usuario/.aMule/amule.conf /home/$usuario/.aMule/amule.conf.backup
 
-# Rutas de directorios desde archivo JSON
-directories_json="amule_directories.json"
-incoming_directory=$(jq -r '.incoming_directory' "$directories_json")
-temp_directory=$(jq -r '.temp_directory' "$directories_json")
+    # Rutas de directorios desde archivo JSON
+    directories_json="amule_directories.json"
+    incoming_directory=$(jq -r '.incoming_directory' "$directories_json")
+    temp_directory=$(jq -r '.temp_directory' "$directories_json")
 
-# Cambiar rutas de directorios en amule.conf
-amule_conf_path="/home/$usuario/.aMule/amule.conf"
-sudo sed -i "s|^IncomingDir=.*$|IncomingDir=$incoming_directory|" "$amule_conf_path"
-sudo sed -i "s|^TempDir=.*$|TempDir=$temp_directory|" "$amule_conf_path"
-sudo sed -i "s|^Template=.*$|Template=webserver|" "$amule_conf_path"
-sudo sed -i "s|^Password=.*$|Password=$(echo -n $contrasena | md5sum | awk '{ print $1 }')|" "$amule_conf_path"
+    # Cambiar rutas de directorios en amule.conf
+    amule_conf_path="/home/$usuario/.aMule/amule.conf"
+    sudo sed -i "s|^IncomingDir=.*$|IncomingDir=$incoming_directory|" "$amule_conf_path"
+    sudo sed -i "s|^TempDir=.*$|TempDir=$temp_directory|" "$amule_conf_path"
+    sudo sed -i "s|^Template=.*$|Template=webserver|" "$amule_conf_path"
+    sudo sed -i "s|^Password=.*$|Password=$(echo -n $contrasena | md5sum | awk '{ print $1 }')|" "$amule_conf_path"
 sudo sed -i "s|^User=.*$|User=pi|" "$amule_conf_path"
 
 # Configurar aMule para que se ejecute al iniciar la Raspberry Pi
@@ -245,58 +245,58 @@ ExecStart=/usr/bin/amule
 WantedBy=graphical.target
 EOL"    
 
-# reinicia el servicio para que coja los cambios
-sudo systemctl daemon-reload
-sudo systemctl enable amule.service
-sudo systemctl enable amule-gui.service
-sudo systemctl restart amule.service
-sudo systemctl restart amule-gui.service
+    # reinicia el servicio para que coja los cambios
+    sudo systemctl daemon-reload
+    sudo systemctl enable amule.service
+    sudo systemctl enable amule-gui.service
+    sudo systemctl restart amule.service
+    sudo systemctl restart amule-gui.service
 
 }
 
 instalar_plex(){
     # Actualiza el sistema
-sudo apt-get update -y
-sudo apt-get upgrade -y
+    sudo apt-get update -y
+    sudo apt-get upgrade -y
 
-# Descarga e instala Plex Media Server
-wget -O plex.deb https://downloads.plex.tv/plex-media-server-new/1.32.0.6918-6f393eda1/debian/plexmediaserver_1.32.0.6918-6f393eda1_armhf.deb?_gl=1*jybto6*_ga*MjY4NzExODIyLjE2ODE0MjY2NzI.*_ga_G6FQWNSENB*MTY4MTQyNjY3Mi4xLjEuMTY4MTQyNjkyMy4wLjAuMA..
+    # Descarga e instala Plex Media Server
+    wget -O plex.deb https://downloads.plex.tv/plex-media-server-new/1.32.0.6918-6f393eda1/debian/plexmediaserver_1.32.0.6918-6f393eda1_armhf.deb?_gl=1*jybto6*_ga*MjY4NzExODIyLjE2ODE0MjY2NzI.*_ga_G6FQWNSENB*MTY4MTQyNjY3Mi4xLjEuMTY4MTQyNjkyMy4wLjAuMA..
 
-sudo dpkg -i plex.deb
+    sudo dpkg -i plex.deb
 
-# Habilita e inicia Plex Media Server
-sudo systemctl enable plexmediaserver.service
-sudo systemctl start plexmediaserver.service
+    # Habilita e inicia Plex Media Server
+    sudo systemctl enable plexmediaserver.service
+    sudo systemctl start plexmediaserver.service
 
-# Muestra la dirección IP del Raspberry Pi
-echo "Plex Media Server instalado. Visita http://$(hostname -I | awk '{print $1}'):32400/web para configurarlo."
+    # Muestra la dirección IP del Raspberry Pi
+    echo "Plex Media Server instalado. Visita http://$(hostname -I | awk '{print $1}'):32400/web para configurarlo."
 }
 
 instalar_bazarr(){
 
-# Instalar dependencias
-sudo apt install -y python3 python3-pip python3-venv libffi-dev zlib1g-dev libicu-dev libxml2-dev libxslt1-dev g++ git
+    # Instalar dependencias
+    sudo apt install -y python3 python3-pip python3-venv libffi-dev zlib1g-dev libicu-dev libxml2-dev libxslt1-dev g++ git
 
-# Crear la carpeta de Bazarr
-mkdir -p /home/$usuario/bazarr
+    # Crear la carpeta de Bazarr
+    mkdir -p /home/$usuario/bazarr
 
-# Clonar el repositorio de Bazarr en la carpeta
-git clone https://github.com/morpheus65535/bazarr.git /home/$usuario/bazarr
+    # Clonar el repositorio de Bazarr en la carpeta
+    git clone https://github.com/morpheus65535/bazarr.git /home/$usuario/bazarr
 
-# Navegar a la carpeta de Bazarr
-cd /home/$usuario/bazarr
+    # Navegar a la carpeta de Bazarr
+    cd /home/$usuario/bazarr
 
-# Crear el entorno virtual de Python
-python3 -m venv venv
+    # Crear el entorno virtual de Python
+    python3 -m venv venv
 
-# Activar el entorno virtual
-source venv/bin/activate
+    # Activar el entorno virtual
+    source venv/bin/activate
 
-# Instalar las dependencias de Bazarr
-pip install -r requirements.txt
+    # Instalar las dependencias de Bazarr
+    pip install -r requirements.txt
 
-# Desactivar el entorno virtual
-deactivate
+    # Desactivar el entorno virtual
+    deactivate
 
 # Crear el servicio de Bazarr
 sudo bash -c "cat > /etc/systemd/system/bazarr.service << EOL
@@ -326,27 +326,27 @@ echo "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
 }
 
 comandos_crontab(){
-# Leemos el archivo JSON y almacenamos la información en un array
-scripts_and_crontab=$(jq -c '.[]' scripts_and_crontab.json)
+    # Leemos el archivo JSON y almacenamos la información en un array
+    scripts_and_crontab=$(jq -c '.[]' scripts_and_crontab.json)
 
-# Aplicar permisos ejecutables y agregar al crontab de root
-for entry in $scripts_and_crontab; do
-  script=$(echo "$entry" | jq -r '.script')
-  crontab_entry=$(echo "$entry" | jq -r '.crontab_entry')
+    # Aplicar permisos ejecutables y agregar al crontab de root
+    for entry in $scripts_and_crontab; do
+    script=$(echo "$entry" | jq -r '.script')
+    crontab_entry=$(echo "$entry" | jq -r '.crontab_entry')
 
-  # Aplicar permisos ejecutables
-  chmod +x "$script"
-  echo "Permisos ejecutables aplicados a: $script"
+    # Aplicar permisos ejecutables
+    chmod +x "$script"
+    echo "Permisos ejecutables aplicados a: $script"
 
-  # Comprobar si el script ya está en el crontab de root
-  if sudo crontab -l | grep -q "$script"; then
-    echo "El script $script ya está en el crontab de root."
-  else
-    # Agregar el script al crontab de root
-    (sudo crontab -l 2>/dev/null; echo "$crontab_entry $script") | sudo crontab -
-    echo "Script $script agregado al crontab de root."
-  fi
-done
+    # Comprobar si el script ya está en el crontab de root
+    if sudo crontab -l | grep -q "$script"; then
+        echo "El script $script ya está en el crontab de root."
+    else
+        # Agregar el script al crontab de root
+        (sudo crontab -l 2>/dev/null; echo "$crontab_entry $script") | sudo crontab -
+        echo "Script $script agregado al crontab de root."
+    fi
+    done
 }
 
 main() {
