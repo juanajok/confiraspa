@@ -32,9 +32,13 @@ leer_credenciales() {
 
 actualizar_raspi() {
     echo "1) Actualizando la Raspberry Pi..."
-    sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt clean
+    sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y && sudo apt clean
     #instalo jq para tratar ficheros json
     sudo apt-get install jq -y
+    # Comando de actualización semanal
+    actualizacion_cmd="0 0 * * 1 sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y && sudo apt clean"
+    # Añade el comando de actualización al crontab del usuario actual
+    (crontab -l 2>/dev/null; echo "$actualizacion_cmd") | crontab -
 }
 
 configurar_ip_estatica() {
