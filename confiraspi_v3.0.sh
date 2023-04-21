@@ -53,7 +53,7 @@ actualizar_raspi() {
 
 
 configurar_ip_estatica() {
-  echo "2) Configurando IP estática..."
+  log "2) Configurando IP estática..."
 
   if [ ! -f ip_config.json ]; then
       log "Error: No se encuentra el archivo ip_config.json. Asegúrate de que el archivo esté presente en la ruta donde estás ejecutando el script."
@@ -316,15 +316,15 @@ instalar_sonarr() {
 
 instalar_webmin() {
     # Descargar el script setup-repos.sh de Webmin
-    echo "Descargando el script setup-repos.sh de Webmin..."
+    log "Descargando el script setup-repos.sh de Webmin..."
     curl -o setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
 
     # Ejecutar setup-repos.sh para configurar el repositorio oficial de Webmin
-    echo "Configurando el repositorio oficial de Webmin..."
+    log "Configurando el repositorio oficial de Webmin..."
     sh setup-repos.sh
 
     # Instalar Webmin y sus dependencias
-    echo "Instalando Webmin y sus dependencias..."
+    log "Instalando Webmin y sus dependencias..."
     sudo apt-get update
     sudo apt-get install webmin
 
@@ -484,7 +484,7 @@ instalar_plex(){
     sudo systemctl start plexmediaserver.service
 
     # Muestra la dirección IP del Raspberry Pi
-    echo "Plex Media Server instalado. Visita http://$(hostname -I | awk '{print $1}'):32400/web para configurarlo."
+    log "Plex Media Server instalado. Visita http://$(hostname -I | awk '{print $1}'):32400/web para configurarlo."
 }
 
 instalar_bazarr(){
@@ -537,7 +537,7 @@ EOL"
     sudo systemctl start bazarr.service
 
     # Mostrar mensaje final
-    echo "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
+    log "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
 }
 
 comandos_crontab(){
@@ -551,7 +551,7 @@ comandos_crontab(){
 
     # Aplicar permisos ejecutables
     chmod +x "$script"
-    echo "Permisos ejecutables aplicados a: $script"
+    log "Permisos ejecutables aplicados a: $script"
 
     # Comprobar si el script ya está en el crontab de root
     if sudo crontab -l | grep -q "$script"; then
@@ -559,7 +559,7 @@ comandos_crontab(){
     else
         # Agregar el script al crontab de root
         (sudo crontab -l 2>/dev/null; echo "$crontab_entry $script") | sudo crontab -
-        echo "Script $script agregado al crontab de root."
+        log "Script $script agregado al crontab de root."
     fi
     done
 }
