@@ -315,23 +315,6 @@ instalar_sonarr() {
 }
 
 instalar_webmin() {
-    # Descargar el script setup-repos.sh de Webmin
-    log "Descargando el script setup-repos.sh de Webmin..."
-    curl -o setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
-
-    # Ejecutar setup-repos.sh para configurar el repositorio oficial de Webmin
-    log "Configurando el repositorio oficial de Webmin..."
-    sh setup-repos.sh
-
-    # Instalar Webmin y sus dependencias
-    log "Instalando Webmin y sus dependencias..."
-    sudo apt-get update
-    sudo apt-get install webmin
-
-    echo "Webmin instalado correctamente. Acceda a la interfaz de Webmin en https://[tu-ip]:10000"
-}
-
-instalar_webmin() {
     log "11) Instalando Webmin..."
 
     # Verificar si Webmin ya está instalado
@@ -399,22 +382,26 @@ habilitar_vnc() {
     log "Se han añadido las líneas para establecer la resolución de pantalla a 1280x720 al final del archivo /boot/config.txt."
 }
 
-
 instalar_amule() {
+    log "Instalando aMule y sus dependencias..."
 
     # Instalar aMule, herramientas necesarias e interfaz gráfica
     sudo apt-get update
     sudo apt-get install -y amule amule-utils amule-daemon amule-utils-gui
+    log "aMule y sus dependencias instaladas correctamente."
 
     # Iniciar el demonio de aMule para generar el archivo de configuración
+    log "Iniciando el demonio de aMule para generar el archivo de configuración..."
     sudo amuled
 
     # Detener el demonio de aMule
     sleep 5
     sudo pkill -f amuled
+    log "El demonio de aMule ha sido detenido."
 
     # copia de seguridad de amule.conf
     sudo cp /home/$usuario/.aMule/amule.conf /home/$usuario/.aMule/amule.conf.backup
+    log "Copia de seguridad de amule.conf creada."
 
     # Rutas de directorios desde archivo JSON
     directories_json="amule_directories.json"
@@ -428,9 +415,11 @@ instalar_amule() {
     sudo sed -i "s|^Template=.*$|Template=webserver|" "$amule_conf_path"
     sudo sed -i "s|^Password=.*$|Password=$(echo -n $contrasena | md5sum | awk '{ print $1 }')|" "$amule_conf_path"
     sudo sed -i "s|^User=.*$|User=pi|" "$amule_conf_path"
+    log "Se han actualizado las rutas de directorios y la configuración en amule.conf."
 
-# Configurar aMule para que se ejecute al iniciar la Raspberry Pi
-sudo bash -c "cat > /etc/systemd/system/amule.service << EOL
+    # Configurar aMule para que se ejecute al iniciar la Raspberry Pi
+    log "Configurando aMule para que se ejecute al iniciar la Raspberry Pi..."
+    sudo bash -c "cat > /etc/systemd/system/amule.service << EOL
 [Unit]
 Description=aMule Daemon
 After=network.target
@@ -446,8 +435,9 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOL"
 
-# Configurar aMule GUI para que se ejecute al iniciar la Raspberry Pi
-sudo bash -c "cat > /etc/systemd/system/amule-gui.service << EOL
+    # Configurar aMule GUI para que se ejecute al iniciar la Raspberry Pi
+    log "Configurando aMule GUI para que se ejecute al iniciar la Raspberry Pi..."
+    sudo bash -c "cat > /etc/systemd/system/amule-gui.service << EOL
 [Unit]
 Description=aMule GUI
 After=amule.service
@@ -459,14 +449,18 @@ ExecStart=/usr/bin/amule
 
 [Install]
 WantedBy=graphical.target
-EOL"    
+EOL"
 
-    # reinicia el servicio para que coja los cambios
+    log "aMule y aMule GUI configurados para ejecutarse al inicio."
+
+    # Reinicia el servicio para que coja los cambios
+    log "Reiniciando servicios de aMule y aMule GUI..."
     sudo systemctl daemon-reload
     sudo systemctl enable amule.service
     sudo systemctl enable amule-gui.service
     sudo systemctl restart amule.service
     sudo systemctl restart amule-gui.service
+    log "Servicios de aMule y aMule GUI reiniciados correctamente."
 }
 
 instalar_plex(){
@@ -487,34 +481,38 @@ instalar_plex(){
     log "Plex Media Server instalado. Visita http://$(hostname -I | awk '{print $1}'):32400/web para configurarlo."
 }
 
-instalar_bazarr(){
-
-    # Instalar dependencias
+instalar_bazarr() {
+    log "Instalando dependencias de Bazarr..."
     sudo apt install -y python3 python3-pip python3-venv libffi-dev zlib1g-dev libicu-dev libxml2-dev libxslt1-dev g++ git
 
-    # Crear la carpeta de Bazarr
+    log "Creando la carpeta de Bazarr..."
     mkdir -p /home/$usuario/bazarr
 
-    # Clonar el repositorio de Bazarr en la carpeta
-    git clone https://github.com/morpheus65535/bazarr.git /home/$usuario/bazarr
+    if [ ! -d "/home/$usuario/bazarr/.git" ]; then
+        log "Clonando el repositorio de Bazarr en la carpeta..."
+        git clone https://github.com/morpheus65535/bazarr.git /home/$usuario/bazarr
+    else
+        log "El repositorio de Bazarr ya está clonado. No es necesario clonarlo de nuevo."
+    fi
 
-    # Navegar a la carpeta de Bazarr
+    log "Navegando a la carpeta de Bazarr..."
     cd /home/$usuario/bazarr
 
-    # Crear el entorno virtual de Python
-    python3 -m venv venv
+    if [ ! -d "venv" ]; then
+        log "Creando el entorno virtual de Python..."
+        python3 -m venv venv
+    else
+        log "El entorno virtual de Python ya existe. No es necesario crearlo de nuevo."
+    fi
 
-    # Activar el entorno virtual
+    log "Activando el entorno virtual y actualizando las dependencias de Bazarr..."
     source venv/bin/activate
-
-    # Instalar las dependencias de Bazarr
     pip install -r requirements.txt
-
-    # Desactivar el entorno virtual
     deactivate
 
-# Crear el servicio de Bazarr
-sudo bash -c "cat > /etc/systemd/system/bazarr.service << EOL
+    if [ ! -f "/etc/systemd/system/bazarr.service" ]; then
+        log "Creando el servicio de Bazarr..."
+        sudo bash -c "cat > /etc/systemd/system/bazarr.service << EOL
 [Unit]
 Description=Bazarr Daemon
 After=syslog.target network.target
@@ -531,38 +529,46 @@ RestartSec=15
 [Install]
 WantedBy=multi-user.target
 EOL"
+    else
+        log "El servicio de Bazarr ya existe. No es necesario crearlo de nuevo."
+    fi
 
-    # Habilitar y iniciar el servicio de Bazarr
+    log "Habilitando e iniciando el servicio de Bazarr..."
     sudo systemctl enable bazarr.service
     sudo systemctl start bazarr.service
 
-    # Mostrar mensaje final
     log "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
 }
 
-comandos_crontab(){
+
+comandos_crontab() {
+    log "Configurando comandos de crontab..."
+
     # Leemos el archivo JSON y almacenamos la información en un array
     scripts_and_crontab=$(jq -c '.[]' scripts_and_crontab.json)
 
     # Aplicar permisos ejecutables y agregar al crontab de root
     for entry in $scripts_and_crontab; do
-    script=$(echo "$entry" | jq -r '.script')
-    crontab_entry=$(echo "$entry" | jq -r '.crontab_entry')
+        script=$(echo "$entry" | jq -r '.script')
+        crontab_entry=$(echo "$entry" | jq -r '.crontab_entry')
 
-    # Aplicar permisos ejecutables
-    chmod +x "$script"
-    log "Permisos ejecutables aplicados a: $script"
+        # Aplicar permisos ejecutables
+        log "Aplicando permisos ejecutables a $script..."
+        chmod +x "$script"
 
-    # Comprobar si el script ya está en el crontab de root
-    if sudo crontab -l | grep -q "$script"; then
-        echo "El script $script ya está en el crontab de root."
-    else
-        # Agregar el script al crontab de root
-        (sudo crontab -l 2>/dev/null; echo "$crontab_entry $script") | sudo crontab -
-        log "Script $script agregado al crontab de root."
-    fi
+        # Comprobar si el script ya está en el crontab de root
+        if sudo crontab -l | grep -q "$script"; then
+            log "El script $script ya está en el crontab de root."
+        else
+            # Agregar el script al crontab de root
+            log "Agregando el script $script al crontab de root..."
+            (sudo crontab -l 2>/dev/null; echo "$crontab_entry $script") | sudo crontab -
+        fi
     done
+
+    log "Configuración de comandos de crontab completada."
 }
+
 
 main() {
     # Llamadas a las funciones
