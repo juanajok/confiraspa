@@ -24,25 +24,41 @@
 #Bazarr: Permite la descarga automática de subtítulos para tus series y películas.
 #aMule: Cliente P2P para compartir archivos a través de la red eD2k y Kademlia.
 
+log() {
+    #función que permitirá que los mensajes de salida identifiquen al script, la función y fecha/hora de ejecución
+    local message="$1"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$0] [${FUNCNAME[1]}] $message"
+}
+
+
 leer_credenciales() {
     usuario=$USER
     credenciales=$(cat credenciales.json)
     contrasena=$(echo "$credenciales" | jq -r '.password')
 }
 
+
 actualizar_raspi() {
-    echo "1) Actualizando la Raspberry Pi..."
+    log "1) Actualizando la Raspberry Pi..."
     sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y && sudo apt clean
     #instalo jq para tratar ficheros json
-    sudo apt-get install jq -y
+    if ! command -v jq > /dev/null 2>&1; then
+        sudo apt-get install jq -y
+    fi
     # Comando de actualización semanal
     actualizacion_cmd="0 0 * * 1 sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y && sudo apt clean"
     # Añade el comando de actualización al crontab del usuario actual
-    (crontab -l 2>/dev/null; echo "$actualizacion_cmd") | crontab -
+    (crontab -l 2>/dev/null | grep -qF -- "$actualizacion_cmd") || (crontab -l 2>/dev/null; echo "$actualizacion_cmd") | crontab -
 }
 
+
 configurar_ip_estatica() {
-  echo "2) Configurando IP estática..."
+  log "2) Configurando IP estática..."
+
+  if [ ! -f ip_config.json ]; then
+      log "Error: No se encuentra el archivo ip_config.json. Asegúrate de que el archivo esté presente en la ruta donde estás ejecutando el script."
+      exit 1
+  fi
 
   # Leer la información de configuración desde el archivo JSON
   config=$(cat ip_config.json)
@@ -53,31 +69,74 @@ configurar_ip_estatica() {
   routers=$(echo "$config" | jq -r '.routers')
   domain_name_servers=$(echo "$config" | jq -r '.domain_name_servers')
 
-  # Hacer una copia de seguridad del archivo /etc/dhcpcd.conf
-  sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.old
+  # Hacer una copia de seguridad del archivo /etc/dhcpcd.conf si no existe previamente
+  if [ ! -f /etc/dhcpcd.conf.backup ]; then
+    sudo cp /etc/dhcpcd.conf /etc/dhcpcd.conf.backup
+    log "copia de seguridad de /etc/dhcpcd.conf en /etc/dhcpcd.conf.backup"
+  else
+    log "el fichero /etc/dhcpcd.conf.backup ya existe. Se obvia el backup"
+  fi
 
-  # Añadir la información de IP estática al final del archivo /etc/dhcpcd.conf
-  echo "interface $interface" | sudo tee -a /etc/dhcpcd.conf
-  echo "static ip_address=$ip_address" | sudo tee -a /etc/dhcpcd.conf
-  echo "static routers=$routers" | sudo tee -a /etc/dhcpcd.conf
-  echo "static domain_name_servers=$domain_name_servers" | sudo tee -a /etc/dhcpcd.conf
+  # Añadir la información de IP estática al final del archivo /etc/dhcpcd.conf si no está presente
+  if ! grep -P "^(?!#).*interface $interface" /etc/dhcpcd.conf; then
+    log "Agregando 'interface $interface' al archivo /etc/dhcpcd.conf..."
+    echo "interface $interface" | sudo tee -a /etc/dhcpcd.conf
+  else
+    log "'interface $interface' ya está presente en el archivo /etc/dhcpcd.conf."
+  fi
+  if ! grep -P "^(?!#).*static ip_address=$ip_address" /etc/dhcpcd.conf; then
+    log "Agregando 'static ip_address=$ip_address' al archivo /etc/dhcpcd.conf..."
+    echo "static ip_address=$ip_address" | sudo tee -a /etc/dhcpcd.conf
+  else
+    log "'static ip_address=$ip_address' ya está presente en el archivo /etc/dhcpcd.conf."
+  fi
+  if ! grep -P "^(?!#).*static routers=$routers" /etc/dhcpcd.conf; then
+    log "Agregando 'static routers=$routers' al archivo /etc/dhcpcd.conf..."
+    echo "static routers=$routers" | sudo tee -a /etc/dhcpcd.conf
+  else
+    log "'static routers=$routers' ya está presente en el archivo /etc/dhcpcd.conf."
+  fi
+  if ! grep -P "^(?!#).*static domain_name_servers=$domain_name_servers" /etc/dhcpcd.conf; then
+    log "Agregando 'static domain_name_servers=$domain_name_servers' al archivo /etc/dhcpcd.conf..."
+    echo "static domain_name_servers=$domain_name_servers" | sudo tee -a /etc/dhcpcd.conf
+  else
+    log "'static domain_name_servers=$domain_name_servers' ya está presente en el archivo /etc/dhcpcd.conf."
+  fi
 }
 
-# Crea puntos de montaje
 crear_puntos_de_montaje() {
-    echo "3) Creando puntos de montaje..."
+    log "Iniciando la creación de puntos de montaje..."
+    
+    # Verificar si el archivo puntos_de_montaje.json existe
+    if [ ! -f puntos_de_montaje.json ]; then
+        log "Error: No se encuentra el archivo puntos_de_montaje.json. Asegúrate de que el archivo esté presente en la ruta donde estás ejecutando el script."
+        exit 1
+    else
+        log "El archivo puntos_de_montaje.json ha sido encontrado."
+    fi
+
     # Leer directorios del archivo JSON
     directorios=$(cat puntos_de_montaje.json | jq -r '.puntos_de_montaje | .[]')
+    log "Leyendo directorios del archivo JSON."
 
     # Crear directorios y aplicar permisos
     for dir in "${directorios[@]}"; do
-        sudo mkdir -p "$dir"
+        if [ ! -d "$dir" ]; then
+            sudo mkdir -p "$dir"
+            log "Punto de montaje creado: $dir"
+        else
+            log "El punto de montaje $dir ya existe."
+        fi
         sudo chmod -R 777 "$dir"
-        echo "Punto de montaje creado y permisos aplicados: $dir"
+        log "Permisos aplicados: $dir"
     done
+
+    log "Finalizando la creación de puntos de montaje..."
 }
 
 generate_fstab() {
+  log "Iniciando la generación del archivo /etc/fstab..."
+
   # Asignamos las particiones
   particiones=$(lsblk -ln -o NAME,SIZE,TYPE,FSTYPE | grep -w 'part' | grep '^sd')
   sorted_partitions=$(echo "$particiones" | sort -k2 -h)
@@ -90,103 +149,256 @@ generate_fstab() {
   wdelements_fstype=$(echo "$sorted_partitions" | tail -n 1 | awk '{print $4}')
 
   # Imprimir los valores de las variables de particiones
-  echo "discoduro_part: $discoduro_part"
-  echo "discoduro_fstype: $discoduro_fstype"
-  echo "backup_part: $backup_part"
-  echo "backup_fstype: $backup_fstype"
-  echo "wdelements_part: $wdelements_part"
-  echo "wdelements_fstype: $wdelements_fstype"
+  log "discoduro_part: $discoduro_part"
+  log "discoduro_fstype: $discoduro_fstype"
+  log "backup_part: $backup_part"
+  log "backup_fstype: $backup_fstype"
+  log "wdelements_part: $wdelements_part"
+  log "wdelements_fstype: $wdelements_fstype"
 
   # Hacer una copia de seguridad del archivo /etc/fstab
-  sudo cp /etc/fstab /etc/fstab.backup
+  if [ ! -f /etc/fstab.backup ]; then
+    sudo cp /etc/fstab /etc/fstab.backup
+    log "Copia de seguridad del archivo /etc/fstab creada."
+  else
+    log "La copia de seguridad del archivo /etc/fstab ya existe."
+  fi
 
   # Añadir las nuevas entradas al archivo /etc/fstab
   new_entries="/dev/$discoduro_part  /media/discoduro        $discoduro_fstype    defaults        0       0
 /dev/$wdelements_part  /media/WDElements       $wdelements_fstype    defaults        0       0
 /dev/$backup_part      /media/Backup           $backup_fstype    defaults        0       0"
 
-  echo "$new_entries" | sudo tee -a /etc/fstab > /dev/null
+  # Comprobar si las entradas ya están presentes en /etc/fstab
+  if ! grep -Fxq "$new_entries" /etc/fstab; then
+    echo "$new_entries" | sudo tee -a /etc/fstab > /dev/null
+    log "Nuevas entradas añadidas al archivo /etc/fstab."
+  else
+    log "Las entradas ya están presentes en el archivo /etc/fstab."
+  fi
+
+  log "Finalizando la generación del archivo /etc/fstab..."
 }
 
+
 instalar_samba() {
-    echo "6) Instalando Samba..."
+    log "6) Instalando Samba..."
+
+    # Verificar si el paquete Samba ya está instalado
+    if dpkg -s samba &> /dev/null; then
+        log "Samba ya está instalado en el sistema."
+        return
+    fi
+
+    # Instalar Samba
+    log "Instalando samba"
     sudo apt install -y samba samba-common-bin
-    sudo cp /etc/samba/smb.conf /etc/samba/smb.conf.old
+
+    # Hacer una copia de seguridad del archivo smb.conf original
+    if [ ! -f /etc/samba/smb.conf.old ]; then
+        sudo cp /etc/samba/smb.conf /etc/samba/smb.conf.old
+        log "Ejecutando copia de seguridad del fichero de configuración /etc/samba/smb.conf"
+    fi
+
+    # Copiar el archivo de configuración smb.conf
     sudo cp smb.conf /etc/samba/smb.conf
+    log "fichero de configuración smb.conf modificado"
+
+    # Reiniciar el servicio smbd
+    log "reiniciando servicio de samba"
     sudo systemctl restart smbd
+
+    log "Samba se ha instalado y configurado correctamente."
 }
 
 instalar_xrdp() {
-    echo "7) Instalando Escritorio Remoto (XRDP)..."
+    log "7) Instalando Escritorio Remoto (XRDP)..."
+    
+    # Verificar si XRDP ya está instalado
+    if dpkg -s xrdp >/dev/null 2>&1; then
+        log "XRDP ya está instalado en el sistema."
+        return 0
+    fi
+    
+    # Instalar XRDP
     sudo apt-get install -y xrdp
+    
+    log "XRDP instalado correctamente."
 }
 
+# Instalar Transmission
 instalar_transmission() {
-    echo "8) Instalando Transmission..."
-    sudo apt-get install -y transmission-daemon
-    sudo /etc/init.d/transmission-daemon stop
-    sudo cp /var/lib/transmission-daemon/info/settings.json /var/lib/transmission-daemon/info/settings.json.old
-    sudo cp settings.json /var/lib/transmission-daemon/info/settings.json
-    sudo /etc/init.d/transmission-daemon start
+    log "8) Instalando Transmission..."
+
+    # Verificar si el paquete transmission-daemon está instalado
+    if ! dpkg -s transmission-daemon >/dev/null 2>&1; then
+        log "El paquete transmission-daemon no está instalado. Instalando..."
+        sudo apt-get install -y transmission-daemon
+    else
+        log "El paquete transmission-daemon ya está instalado. Continuando..."
+    fi
+
+    # Hacer una copia de seguridad del archivo de configuración de Transmission
+    if [ -f /var/lib/transmission-daemon/info/settings.json ]; then
+        sudo cp /var/lib/transmission-daemon/info/settings.json /var/lib/transmission-daemon/info/settings.json.old
+        log "Copia de seguridad del archivo de configuración de Transmission creada: /var/lib/transmission-daemon/info/settings.json.old"
+    else
+        log "No se encontró el archivo de configuración de Transmission. Continuando..."
+    fi
+
+    # Copiar el archivo de configuración de Transmission al directorio de configuración de Transmission
+    if [ -f settings.json ]; then
+        sudo cp settings.json /var/lib/transmission-daemon/info/settings.json
+        log "Archivo de configuración de Transmission copiado: /var/lib/transmission-daemon/info/settings.json"
+    else
+        log "No se encontró el archivo de configuración de Transmission. Continuando..."
+    fi
+
+    # Reiniciar el servicio de Transmission
+    sudo service transmission-daemon restart
+    log "Servicio de Transmission reiniciado."
 }
 
 instalar_mono() {
-    echo "9) Instalando Mono..."
+    log "9) Instalando Mono..."
+
+    # Comprobar si Mono está instalado
+    if dpkg -s mono-devel >/dev/null 2>&1; then
+        log "Mono ya está instalado."
+        return 0
+    fi
+
+    # Instalar Mono
+    log "Instalando dependencias necesarias..."
     sudo apt install -y apt-transport-https dirmngr gnupg ca-certificates
+
+    log "Añadiendo la clave de firma de Mono..."
     sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+
+    log "Añadiendo el repositorio de Mono..."
     echo "deb https://download.mono-project.com/repo/debian stable-buster main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
+
+    log "Actualizando el índice de paquetes..."
     sudo apt update
-    sudo apt install mono-devel -y
+
+    log "Instalando Mono..."
+    sudo apt install -y mono-devel
+
+    log "Mono instalado con éxito."
 }
 
+
 instalar_sonarr() {
-    echo "10) Instalando Sonarr..."
+    log "10) Instalando Sonarr..."
+
+    # Verificar si Sonarr ya está instalado
+    if dpkg -s sonarr > /dev/null 2>&1; then
+        log "Sonarr ya está instalado, saltando..."
+        return 0
+    fi
+
+    # Agregar la clave GPG de Sonarr
+    log "Agregando clave GPG de Sonarr..."
     sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 2009837CBFFD68F45BC180471F4F90DE2A9B4BF8
+
+    # Agregar el repositorio de Sonarr
+    log "Agregando repositorio de Sonarr..."
     echo "deb https://apt.sonarr.tv/debian buster main" | sudo tee /etc/apt/sources.list.d/sonarr.list
+
+    # Actualizar el índice de paquetes
+    log "Actualizando el índice de paquetes..."
     sudo apt update
+
+    # Instalar Sonarr
+    log "Instalando Sonarr..."
     sudo apt install -y sonarr
 }
 
-
 instalar_webmin() {
     # Descargar el script setup-repos.sh de Webmin
-    echo "Descargando el script setup-repos.sh de Webmin..."
+    log "Descargando el script setup-repos.sh de Webmin..."
     curl -o setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
 
     # Ejecutar setup-repos.sh para configurar el repositorio oficial de Webmin
-    echo "Configurando el repositorio oficial de Webmin..."
+    log "Configurando el repositorio oficial de Webmin..."
     sh setup-repos.sh
 
     # Instalar Webmin y sus dependencias
-    echo "Instalando Webmin y sus dependencias..."
+    log "Instalando Webmin y sus dependencias..."
     sudo apt-get update
     sudo apt-get install webmin
 
     echo "Webmin instalado correctamente. Acceda a la interfaz de Webmin en https://[tu-ip]:10000"
 }
 
+instalar_webmin() {
+    log "11) Instalando Webmin..."
 
-habilitar_vnc(){
-    # Habilitar el servidor VNC para que se ejecute al inicio
-    sudo systemctl enable vncserver-x11-serviced.service
+    # Verificar si Webmin ya está instalado
+    if dpkg-query -W -f='${Status}' webmin | grep -q "installed"; then
+        log "Webmin ya está instalado en el sistema."
+        return 0
+    fi
 
-    # Iniciar el servidor VNC
-    sudo systemctl start vncserver-x11-serviced.service
+    # Descargar el script setup-repos.sh de Webmin
+    log "Descargando el script setup-repos.sh de Webmin..."
+    curl -o setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
 
-    # Mostrar el estado del servicio VNC para verificar que se ha iniciado correctamente
-    sudo systemctl status vncserver-x11-serviced.service
+    # Ejecutar setup-repos.sh para configurar el repositorio oficial de Webmin
+    log "Configurando el repositorio oficial de Webmin..."
+    sh setup-repos.sh
+
+    # Instalar Webmin y sus dependencias
+    log "Instalando Webmin y sus dependencias..."
+    sudo apt-get update
+    sudo apt-get install -y webmin
+
+    # Verificar si la instalación de Webmin fue exitosa
+    if dpkg-query -W -f='${Status}' webmin | grep -q "installed"; then
+        log "Webmin instalado correctamente. Acceda a la interfaz de Webmin en https://[tu-ip]:10000"
+        return 0
+    else
+        log "Error: No se pudo instalar Webmin correctamente."
+        return 1
+    fi
+}
+
+
+habilitar_vnc() {
+    log "11) Habilitando VNC..."
+
+    # Verificar si el servicio VNC ya está habilitado
+    if systemctl is-enabled vncserver-x11-serviced.service &> /dev/null; then
+        log "El servicio VNC ya está habilitado. No es necesario hacer nada."
+    else
+        # Habilitar el servidor VNC para que se ejecute al inicio
+        sudo systemctl enable vncserver-x11-serviced.service
+        log "El servicio VNC ha sido habilitado para ejecutarse al inicio."
+
+        # Iniciar el servidor VNC
+        sudo systemctl start vncserver-x11-serviced.service
+        log "El servicio VNC ha sido iniciado correctamente."
+
+        # Mostrar el estado del servicio VNC para verificar que se ha iniciado correctamente
+        sudo systemctl status vncserver-x11-serviced.service | grep -q 'active (running)' && log "El servicio VNC se ha iniciado correctamente." || (log "Error: No se ha podido iniciar el servicio VNC. Verifica la configuración." && exit 1)
+    fi
 
     # Hacer una copia de seguridad del archivo /boot/config.txt
     sudo cp /boot/config.txt /boot/config.txt.backup
+    log "Se ha creado una copia de seguridad del archivo /boot/config.txt."
 
     # Eliminar las líneas que contienen hdmi_group y hdmi_mode si ya existen
-    sudo sed -i '/^hdmi_group=/d' /boot/config.txt
-    sudo sed -i '/^hdmi_mode=/d' /boot/config.txt
+    if grep -qP '^(?!#)\s*hdmi_group=' /boot/config.txt && grep -qP '^(?!#)\s*hdmi_mode=' /boot/config.txt; then
+        sudo sed -i '/^\s*hdmi_group=/d' /boot/config.txt
+        sudo sed -i '/^\s*hdmi_mode=/d' /boot/config.txt
+        log "Las líneas que contenían hdmi_group y hdmi_mode han sido eliminadas del archivo /boot/config.txt."
+    fi
 
     # Añadir las líneas al final del archivo /boot/config.txt para establecer la resolución de pantalla a 1280x720
-    echo "hdmi_group=2" | sudo tee -a /boot/config.txt
-    echo "hdmi_mode=85" | sudo tee -a /boot/config.txt
+    echo -e "\nhdmi_group=2\nhdmi_mode=85" | sudo tee -a /boot/config.txt > /dev/null
+    log "Se han añadido las líneas para establecer la resolución de pantalla a 1280x720 al final del archivo /boot/config.txt."
 }
+
 
 instalar_amule() {
 
@@ -272,7 +484,7 @@ instalar_plex(){
     sudo systemctl start plexmediaserver.service
 
     # Muestra la dirección IP del Raspberry Pi
-    echo "Plex Media Server instalado. Visita http://$(hostname -I | awk '{print $1}'):32400/web para configurarlo."
+    log "Plex Media Server instalado. Visita http://$(hostname -I | awk '{print $1}'):32400/web para configurarlo."
 }
 
 instalar_bazarr(){
@@ -325,7 +537,7 @@ EOL"
     sudo systemctl start bazarr.service
 
     # Mostrar mensaje final
-    echo "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
+    log "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
 }
 
 comandos_crontab(){
@@ -339,7 +551,7 @@ comandos_crontab(){
 
     # Aplicar permisos ejecutables
     chmod +x "$script"
-    echo "Permisos ejecutables aplicados a: $script"
+    log "Permisos ejecutables aplicados a: $script"
 
     # Comprobar si el script ya está en el crontab de root
     if sudo crontab -l | grep -q "$script"; then
@@ -347,7 +559,7 @@ comandos_crontab(){
     else
         # Agregar el script al crontab de root
         (sudo crontab -l 2>/dev/null; echo "$crontab_entry $script") | sudo crontab -
-        echo "Script $script agregado al crontab de root."
+        log "Script $script agregado al crontab de root."
     fi
     done
 }
@@ -373,4 +585,3 @@ main() {
 }
 
 main
-
