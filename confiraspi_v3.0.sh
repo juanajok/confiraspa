@@ -53,6 +53,7 @@ actualizar_raspi() {
     #instalo jq para tratar ficheros json
     if ! command -v jq > /dev/null 2>&1; then
         sudo apt-get install jq -y
+        sudo apt-get install -y moreutils
     fi
     # Comando de actualización semanal
     actualizacion_cmd="0 0 * * 1 sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y && sudo apt clean"
@@ -235,7 +236,6 @@ instalar_xrdp() {
     log "XRDP instalado correctamente."
 }
 
-# Instalar Transmission
 instalar_transmission() {
     log "8) Instalando Transmission..."
 
@@ -248,25 +248,35 @@ instalar_transmission() {
     fi
 
     # Hacer una copia de seguridad del archivo de configuración de Transmission
-    if [ -f /var/lib/transmission-daemon/info/settings.json ]; then
-        sudo cp /var/lib/transmission-daemon/info/settings.json /var/lib/transmission-daemon/info/settings.json.old
-        log "Copia de seguridad del archivo de configuración de Transmission creada: /var/lib/transmission-daemon/info/settings.json.old"
+    CONFIG_FILE="/var/lib/transmission-daemon/info/settings.json"
+    if [ -f $CONFIG_FILE ]; then
+        sudo cp $CONFIG_FILE "${CONFIG_FILE}.bck"
+        log "Copia de seguridad del archivo de configuración de Transmission creada: ${CONFIG_FILE}.bck"
     else
         log "No se encontró el archivo de configuración de Transmission. Continuando..."
     fi
 
-    # Copiar el archivo de configuración de Transmission al directorio de configuración de Transmission
-    if [ -f settings.json ]; then
-        sudo cp settings.json /var/lib/transmission-daemon/info/settings.json
-        log "Archivo de configuración de Transmission copiado: /var/lib/transmission-daemon/info/settings.json"
+    # Leer el directorio temporal y el directorio de descargas completadas de amule_directories.json
+    if [ -f amule_directories.json ]; then
+        TEMP_DIR=$(jq -r '.temp_directory' amule_directories.json)
+        DOWNLOAD_DIR=$(jq -r '.incoming_directory' amule_directories.json)
     else
-        log "No se encontró el archivo de configuración de Transmission. Continuando..."
+        log "No se encontró el archivo amule_directories.json. "
+        exit
     fi
+
+    # Modificar el archivo de configuración de Transmission
+    sudo jq --arg temp_dir "$TEMP_DIR" --arg download_dir "$DOWNLOAD_DIR" \
+        '.["incomplete-dir"]=$temp_dir | .["download-dir"]=$download_dir | .["rpc-username"]="transmission" | .["rpc-password"]="transmission" | .["rpc-whitelist-enabled"]=true | .["rpc-whitelist"]="192.168.*.*"' $CONFIG_FILE | sudo sponge $CONFIG_FILE
+    log "Archivo de configuración de Transmission modificado: ${CONFIG_FILE}"
+
+   
 
     # Reiniciar el servicio de Transmission
     sudo service transmission-daemon restart
     log "Servicio de Transmission reiniciado."
 }
+
 
 instalar_mono() {
     log "9) Instalando Mono..."
@@ -429,6 +439,9 @@ instalar_amule() {
     sudo sed -i "s|^Password=.*$|Password=$(echo -n $contrasena | md5sum | awk '{ print $1 }')|" "$amule_conf_path"
     sudo sed -i "s|^User=.*$|User=pi|" "$amule_conf_path"
     sudo sed -i "s|^AcceptExternalConnections=.*$|AcceptExternalConnections=1|" "$amule_conf_path"
+    #Habilitamos conexiones externas a través del puerto 4711
+    sudo sed -i "/^\[WebServer\]/,/^\[/ s|^Enabled=.*$|Enabled=1|" "$amule_conf_path"
+    sudo sed -i "/^\[WebServer\]/,/^\[/ s|^Port=.*$|Port=4711|" "$amule_conf_path"
 
     log "Se han actualizado las rutas de directorios y la configuración en amule.conf."
 
