@@ -23,15 +23,15 @@ Uso
 ====
 1)  Clone este repositorio en su Raspberry Pi (preferiblemente en /opt): 
  
-sudo git clone https://github.com/your-username/your-repository.git /opt/confiraspa
+sudo git clone https://github.com/juanajok/confiraspa /opt/confiraspa
 
 2)  Navegue hasta el directorio del repositorio clonado:
  
-cd your-repository
+cd /opt/confiraspa
 
 3)  Asegúrese de que el script confiraspi sea ejecutable:
 
-chmod +x confiraspi
+sudo chmod +x confiraspi_v3.0.sh
 
 4)  Edite el archivo ip_config.json en el directorio del repositorio clonado, con la siguiente estructura:
 
@@ -55,7 +55,7 @@ La aplicación aMule heredará el usuario con que ejecutes el script y la contra
 
 6)  Ejecute el script:
 
-./confiraspi
+sudo bash ./confiraspi_v3.0.sh
 Siga las instrucciones en pantalla y espere a que se complete la ejecución del script.
 
 
