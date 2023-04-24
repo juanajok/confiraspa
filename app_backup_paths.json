@@ -1,0 +1,28 @@
+{
+    "app_paths": [
+        {
+            "path": "/media/Backup/radarr/scheduled",
+            "num_copies_to_keep": 5
+        },
+        {
+            "path": "/media/Backup/sonarr/scheduled",
+            "num_copies_to_keep": 5
+        },
+        {
+            "path": "/media/Backup/readarr/scheduled",
+            "num_copies_to_keep": 5
+        },
+        {
+            "path": "/media/Backup/lidarr/scheduled",
+            "num_copies_to_keep": 5
+        },
+        {
+            "path": "/media/Backup/prowlarr/scheduled",
+            "num_copies_to_keep": 5
+        },
+        {
+            "path": "/media/Backup/whishparr/scheduled",
+            "num_copies_to_keep": 5
+        }
+    ]
+}
