@@ -1,14 +1,14 @@
 [
-    {
-      "script": "/home/$usuario/confiraspa/change_permissions.sh",
-      "crontab_entry": "0 * * * *"
-    },
-    {
-      "script": "/home/$usuario/confiraspa/backup_rsync.sh",
-      "crontab_entry": "0 2 * * *"
-    },
-    {
-      "script": "/home/pi/$usuario/rotabackup.py",
-      "crontab_entry": "0 3 * * * /usr/bin/python3"
-    }
-  ]
+  {
+    "script": "SCRIPT_PATH_PLACEHOLDER/change_permissions.sh",
+    "crontab_entry": "0 * * * *"
+  },
+  {
+    "script": "SCRIPT_PATH_PLACEHOLDER/backup_rsync.sh",
+    "crontab_entry": "0 2 * * *"
+  },
+  {
+    "script": "SCRIPT_PATH_PLACEHOLDER/rotabackup.py",
+    "crontab_entry": "0 3 * * * /usr/bin/python3"
+  }
+]

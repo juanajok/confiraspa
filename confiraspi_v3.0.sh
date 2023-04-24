@@ -32,9 +32,18 @@ log() {
 
 
 leer_credenciales() {
-    usuario=$USER
+    if [ "$EUID" -ne 0 ]
+    then
+        log "Error: Por favor, ejecuta el script como superusuario (sudo)."
+        exit 1
+    fi
+
+    usuario="$SUDO_USER"
     credenciales=$(cat credenciales.json)
     contrasena=$(echo "$credenciales" | jq -r '.password')
+    log "Info:  Se usuará el usuario $usuario que corre este script como credenciales para el resto de instaciones"
+    ruta_instalacion=
+    script_path="$(dirname "$(realpath "$0")")"
 }
 
 
@@ -392,12 +401,22 @@ instalar_amule() {
 
     # Iniciar el demonio de aMule para generar el archivo de configuración
     log "Iniciando el demonio de aMule para generar el archivo de configuración..."
-    sudo amuled
+    sudo amuled --ec-config
+    # Iniciar el demonio de aMule para generar el archivo de configuración
+    log "Iniciando el demonio de aMule para generar el archivo de configuración..."
+    sudo -u $usuario amuled
 
+    #Detener el demonio de aMule
+    sleep 20
+    sudo pkill -f amuled
+    log "El demonio de aMule ha sido detenido."
     # Detener el demonio de aMule
     sleep 5
     sudo pkill -f amuled
     log "El demonio de aMule ha sido detenido."
+    
+    #volvemos al directorio donde está el script
+    cd "$script_path"
 
     # copia de seguridad de amule.conf
     sudo cp /home/$usuario/.aMule/amule.conf /home/$usuario/.aMule/amule.conf.backup
@@ -463,23 +482,41 @@ EOL"
     log "Servicios de aMule y aMule GUI reiniciados correctamente."
 }
 
-instalar_plex(){
+
+instalar_plex() {
+    log "Instalando Plex Media Server..."
+
     # Actualiza el sistema
+    log "Actualizando el sistema..."
     sudo apt-get update -y
     sudo apt-get upgrade -y
 
-    # Descarga e instala Plex Media Server
-    wget -O plex.deb https://downloads.plex.tv/plex-media-server-new/1.32.0.6918-6f393eda1/debian/plexmediaserver_1.32.0.6918-6f393eda1_armhf.deb?_gl=1*jybto6*_ga*MjY4NzExODIyLjE2ODE0MjY2NzI.*_ga_G6FQWNSENB*MTY4MTQyNjY3Mi4xLjEuMTY4MTQyNjkyMy4wLjAuMA..
+    # Verifica si Plex ya está instalado
+    if ! dpkg -s plexmediaserver >/dev/null 2>&1; then
+        # Descarga e instala Plex Media Server
+        log "Descargando Plex Media Server..."
+        wget -O plex.deb https://downloads.plex.tv/plex-media-server-new/1.32.0.6918-6f393eda1/debian/plexmediaserver_1.32.0.6918-6f393eda1_armhf.deb?_gl=1*jybto6*_ga*MjY4NzExODIyLjE2ODE0MjY2NzI.*_ga_G6FQWNSENB*MTY4MTQyNjY3Mi4xLjEuMTY4MTQyNjkyMy4wLjAuMA..
 
-    sudo dpkg -i plex.deb
+        log "Instalando Plex Media Server..."
+        sudo dpkg -i plex.deb
+        rm plex.deb
+    else
+        log "Plex Media Server ya está instalado."
+    fi
 
-    # Habilita e inicia Plex Media Server
-    sudo systemctl enable plexmediaserver.service
-    sudo systemctl start plexmediaserver.service
+    # Habilita e inicia Plex Media Server si no está activo
+    if ! systemctl is-active --quiet plexmediaserver.service; then
+        log "Habilitando e iniciando Plex Media Server..."
+        sudo systemctl enable plexmediaserver.service
+        sudo systemctl start plexmediaserver.service
+    else
+        log "Plex Media Server ya está habilitado e iniciado."
+    fi
 
     # Muestra la dirección IP del Raspberry Pi
     log "Plex Media Server instalado. Visita http://$(hostname -I | awk '{print $1}'):32400/web para configurarlo."
 }
+
 
 instalar_bazarr() {
     log "Instalando dependencias de Bazarr..."
@@ -538,17 +575,21 @@ EOL"
     sudo systemctl start bazarr.service
 
     log "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
+    #volvemos al directorio donde está el script
+        cd "$script_path"
 }
 
 
 comandos_crontab() {
     log "Configurando comandos de crontab..."
+    #volvemos al directorio donde está el script
+    cd "$script_path"
 
-    # Leemos el archivo JSON y almacenamos la información en un array
-    scripts_and_crontab=$(jq -c '.[]' scripts_and_crontab.json)
+    # Reemplaza el marcador de posición por el valor de la variable $script_path
+    json_data=$(sed "s@SCRIPT_PATH_PLACEHOLDER@$script_path@g" scripts_and_crontab.json)
 
-    # Aplicar permisos ejecutables y agregar al crontab de root
-    for entry in $scripts_and_crontab; do
+    # Itera sobre el array de objetos JSON y ejecuta el cuerpo del bucle para cada objeto
+    echo "$json_data" | jq -c '.[]' | while read -r entry; do
         script=$(echo "$entry" | jq -r '.script')
         crontab_entry=$(echo "$entry" | jq -r '.crontab_entry')
 
@@ -568,6 +609,7 @@ comandos_crontab() {
 
     log "Configuración de comandos de crontab completada."
 }
+
 
 
 main() {

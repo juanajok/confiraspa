@@ -32,11 +32,14 @@
     {
       "origen": "/var/lib/prowlarr/Backups/scheduled",
       "destino": "/media/Backup/prowlarr"
-    }
-    ,
+    },
     {
       "origen": "/var/lib/wishparr/Backups/scheduled",
       "destino": "/media/Backup/wishparr"
+    }.
+    {
+      "origen": "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/preferences.xml",
+      "destino": "/media/Backup/plexmediaserver"
     }
   ]
 }
