@@ -11,6 +11,32 @@
     {
       "origen": "/media/WDElements/Tebeos",
       "destino": "/media/Backup"
+    },
+  
+    {
+      "origen": "/var/lib/sonarr/Backups/scheduled",
+      "destino": "/media/Backup/sonarr"
+    },
+    {
+      "origen": "/var/lib/radarr/Backups/scheduled",
+      "destino": "/media/Backup/radarr"
+    },
+    {
+      "origen": "/var/lib/readarr/Backups/scheduled",
+      "destino": "/media/Backup/readarr"
+    },
+    {
+      "origen": "/var/lib/lidarr/Backups/scheduled",
+      "destino": "/media/Backup/lidarr"
+    },
+    {
+      "origen": "/var/lib/prowlarr/Backups/scheduled",
+      "destino": "/media/Backup/prowlarr"
+    }
+    ,
+    {
+      "origen": "/var/lib/prowlarr/Backups/scheduled",
+      "destino": "/media/Backup/wishparr"
     }
   ]
 }
