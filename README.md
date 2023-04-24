@@ -21,9 +21,9 @@ Asegúrese de tener una Raspberry Pi con una distribución basada en Debian (por
 
 Uso
 ====
-1)  Clone este repositorio en su Raspberry Pi:
+1)  Clone este repositorio en su Raspberry Pi (preferiblemente en /opt): 
  
-git clone https://github.com/your-username/your-repository.git
+sudo git clone https://github.com/your-username/your-repository.git /opt/confiraspa
 
 2)  Navegue hasta el directorio del repositorio clonado:
  

@@ -399,12 +399,10 @@ instalar_amule() {
     sudo apt-get install -y amule amule-utils amule-daemon amule-utils-gui
     log "aMule y sus dependencias instaladas correctamente."
 
+  
     # Iniciar el demonio de aMule para generar el archivo de configuración
     log "Iniciando el demonio de aMule para generar el archivo de configuración..."
-    sudo amuled --ec-config
-    # Iniciar el demonio de aMule para generar el archivo de configuración
-    log "Iniciando el demonio de aMule para generar el archivo de configuración..."
-    sudo -u $usuario amuled
+    sudo -u $usuario amuled &
 
     #Detener el demonio de aMule
     sleep 20
