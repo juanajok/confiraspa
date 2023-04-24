@@ -523,17 +523,17 @@ instalar_bazarr() {
     sudo apt install -y python3 python3-pip python3-venv libffi-dev zlib1g-dev libicu-dev libxml2-dev libxslt1-dev g++ git
 
     log "Creando la carpeta de Bazarr..."
-    mkdir -p /home/$usuario/bazarr
+    mkdir -p /opt/bazarr
 
-    if [ ! -d "/home/$usuario/bazarr/.git" ]; then
+    if [ ! -d "/opt/bazarr/.git" ]; then
         log "Clonando el repositorio de Bazarr en la carpeta..."
-        git clone https://github.com/morpheus65535/bazarr.git /home/$usuario/bazarr
+        git clone https://github.com/morpheus65535/bazarr.git /opt/bazarr
     else
         log "El repositorio de Bazarr ya está clonado. No es necesario clonarlo de nuevo."
     fi
 
     log "Navegando a la carpeta de Bazarr..."
-    cd /home/$usuario/bazarr
+    cd /opt/bazarr
 
     if [ ! -d "venv" ]; then
         log "Creando el entorno virtual de Python..."
@@ -559,7 +559,7 @@ User=$usuario
 Group=$usuario
 UMask=002
 Type=simple
-ExecStart=/home/$usuario/bazarr/venv/bin/python3 /home/$usuario/bazarr/bazarr.py
+ExecStart=/opt/bazarr/venv/bin/python3 /opt/bazarr/bazarr.py
 Restart=always
 RestartSec=15
 
@@ -576,7 +576,7 @@ EOL"
 
     log "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
     #volvemos al directorio donde está el script
-        cd "$script_path"
+    cd "$script_path"
 }
 
 
