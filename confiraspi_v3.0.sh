@@ -267,7 +267,7 @@ instalar_transmission() {
 
     # Modificar el archivo de configuración de Transmission
     sudo jq --arg temp_dir "$TEMP_DIR" --arg download_dir "$DOWNLOAD_DIR" \
-        '.["incomplete-dir"]=$temp_dir | .["download-dir"]=$download_dir | .["rpc-username"]="transmission" | .["rpc-password"]="transmission" | .["rpc-whitelist-enabled"]=true | .["rpc-whitelist"]="192.168.*.*"' $CONFIG_FILE | sudo sponge $CONFIG_FILE
+    '.["incomplete-dir"]=$temp_dir | .["download-dir"]=$download_dir | .["rpc-username"]="transmission" | .["rpc-password"]="transmission" | .["rpc-whitelist-enabled"]=false | .["rpc-whitelist"]="192.168.*.*"' $CONFIG_FILE | sudo sponge $CONFIG_FILE
     log "Archivo de configuración de Transmission modificado: ${CONFIG_FILE}"
 
    
