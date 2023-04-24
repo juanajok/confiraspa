@@ -35,7 +35,7 @@
     }
     ,
     {
-      "origen": "/var/lib/prowlarr/Backups/scheduled",
+      "origen": "/var/lib/wishparr/Backups/scheduled",
       "destino": "/media/Backup/wishparr"
     }
   ]

@@ -33,10 +33,10 @@ def read_app_paths(json_file):
         return data["app_paths"]
 
 # Encuentra los archivos en la carpeta y devuelve los 3 más recientes según su fecha de modificación
-def get_latest_backups(folder):
+def get_latest_backups(folder, num_copies_to_keep):
     all_files = glob.glob(os.path.join(folder, "*"))
     all_files.sort(key=os.path.getmtime, reverse=True)
-    return all_files[:3]
+    return all_files[:num_copies_to_keep]
 
 # Elimina todos los archivos que no estén en la lista latest_backups si aún existen
 def remove_old_backups(folder, latest_backups):
@@ -53,11 +53,15 @@ def main():
         num_copies_to_keep = app_config["num_copies_to_keep"]
         folder = Path(app_path)
         
-        if folder.exists() and folder.is_dir():
+        if not folder.exists():
+            print(f"[{datetime.now()}] [INFO] [{os.path.basename(__file__)}] La ruta '{app_path}' no existe. Creando la carpeta.")
+            folder.mkdir(parents=True, exist_ok=True)
+
+        if folder.is_dir():
             latest_backups = get_latest_backups(app_path, num_copies_to_keep)
             remove_old_backups(app_path, latest_backups)
         else:
-            print(f"[{datetime.now()}] [ERROR] [{os.path.basename(__file__)}] La ruta '{app_path}' no existe o no es un directorio. Comprueba las rutas de las aplicaciones.")
+            print(f"[{datetime.now()}] [ERROR] [{os.path.basename(__file__)}] La ruta '{app_path}' no es un directorio. Comprueba las rutas de las aplicaciones.")
 
 if __name__ == "__main__":
     main()

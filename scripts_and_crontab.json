@@ -6,5 +6,9 @@
     {
       "script": "/home/$usuario/confiraspa/backup_rsync.sh",
       "crontab_entry": "0 2 * * *"
+    },
+    {
+      "script": "/home/pi/$usuario/rotabackup.py",
+      "crontab_entry": "0 3 * * * /usr/bin/python3"
     }
   ]
