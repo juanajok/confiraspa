@@ -402,14 +402,10 @@ instalar_amule() {
   
     # Iniciar el demonio de aMule para generar el archivo de configuración
     log "Iniciando el demonio de aMule para generar el archivo de configuración..."
-    sudo -u $usuario amuled &
+    sudo -u $usuario bash -c "amuled --ec-config <<< \"$contrasena\"" &
 
     #Detener el demonio de aMule
     sleep 20
-    sudo pkill -f amuled
-    log "El demonio de aMule ha sido detenido."
-    # Detener el demonio de aMule
-    sleep 5
     sudo pkill -f amuled
     log "El demonio de aMule ha sido detenido."
     
@@ -432,6 +428,8 @@ instalar_amule() {
     sudo sed -i "s|^Template=.*$|Template=webserver|" "$amule_conf_path"
     sudo sed -i "s|^Password=.*$|Password=$(echo -n $contrasena | md5sum | awk '{ print $1 }')|" "$amule_conf_path"
     sudo sed -i "s|^User=.*$|User=pi|" "$amule_conf_path"
+    sudo sed -i "s|^AcceptExternalConnections=.*$|AcceptExternalConnections=1|" "$amule_conf_path"
+
     log "Se han actualizado las rutas de directorios y la configuración en amule.conf."
 
     # Configurar aMule para que se ejecute al iniciar la Raspberry Pi
@@ -628,6 +626,7 @@ main() {
     instalar_bazarr
     instalar_amule
     comandos_crontab
+    log "Info: script finalizado, por favor reinicia para que los cambios tengan efecto"
 }
 
 main
