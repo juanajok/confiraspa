@@ -242,16 +242,19 @@ instalar_transmission() {
     # Verificar si el paquete transmission-daemon está instalado
     if ! dpkg -s transmission-daemon >/dev/null 2>&1; then
         log "El paquete transmission-daemon no está instalado. Instalando..."
-        sudo apt-get install -y transmission-daemon
+        sudo apt-get install -y t
     else
         log "El paquete transmission-daemon ya está instalado. Continuando..."
     fi
 
+    # paramos el servicio de transmission para poder modificar el fichero de configuración
+    sudo service transmission-daemon stop
+
     # Hacer una copia de seguridad del archivo de configuración de Transmission
     CONFIG_FILE="/var/lib/transmission-daemon/info/settings.json"
     if [ -f $CONFIG_FILE ]; then
-        sudo cp $CONFIG_FILE "${CONFIG_FILE}.bck"
-        log "Copia de seguridad del archivo de configuración de Transmission creada: ${CONFIG_FILE}.bck"
+    sudo jq --arg temp_dir "$TEMP_DIR" --arg download_dir "$DOWNLOAD_DIR" \
+    '.["incomplete-dir"]=$temp_dir | .["download-dir"]=$download_dir | .["rpc-username"]="transmission" | .["rpc-password"]="transmission" | .["rpc-whitelist-enabled"]=true | .["rpc-whitelist"]="192.168.*.*"' $CONFIG_FILE | sudo sponge $CONFIG_FILE
     else
         log "No se encontró el archivo de configuración de Transmission. Continuando..."
     fi
@@ -265,12 +268,6 @@ instalar_transmission() {
         exit
     fi
 
-    # Modificar el archivo de configuración de Transmission
-    sudo jq --arg temp_dir "$TEMP_DIR" --arg download_dir "$DOWNLOAD_DIR" \
-    '.["incomplete-dir"]=$temp_dir | .["download-dir"]=$download_dir | .["rpc-username"]="transmission" | .["rpc-password"]="transmission" | .["rpc-whitelist-enabled"]=false | .["rpc-whitelist"]="192.168.*.*"' $CONFIG_FILE | sudo sponge $CONFIG_FILE
-    log "Archivo de configuración de Transmission modificado: ${CONFIG_FILE}"
-
-   
 
     # Reiniciar el servicio de Transmission
     sudo service transmission-daemon restart
@@ -442,6 +439,8 @@ instalar_amule() {
     #Habilitamos conexiones externas a través del puerto 4711
     sudo sed -i "/^\[WebServer\]/,/^\[/ s|^Enabled=.*$|Enabled=1|" "$amule_conf_path"
     sudo sed -i "/^\[WebServer\]/,/^\[/ s|^Port=.*$|Port=4711|" "$amule_conf_path"
+    # Establecer contraseña cifrada para conexiones externas
+    sudo sed -i "s|^ECPassword=.*$|ECPassword=$(echo -n $contrasena | md5sum | awk '{ print $1 }')|" "$amule_conf_path"
 
     log "Se han actualizado las rutas de directorios y la configuración en amule.conf."
 
