@@ -242,7 +242,7 @@ instalar_transmission() {
     # Verificar si el paquete transmission-daemon está instalado
     if ! dpkg -s transmission-daemon >/dev/null 2>&1; then
         log "El paquete transmission-daemon no está instalado. Instalando..."
-        sudo apt-get install -y t
+        sudo apt-get install -y transmission-daemon
     else
         log "El paquete transmission-daemon ya está instalado. Continuando..."
     fi
