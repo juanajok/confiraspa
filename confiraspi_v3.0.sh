@@ -532,6 +532,8 @@ instalar_bazarr() {
 
     log "Creando la carpeta de Bazarr..."
     mkdir -p /opt/bazarr
+    chown $usuario:$usuario /opt/bazarr
+    chmod 755 /opt/bazarr
 
     if [ ! -d "/opt/bazarr/.git" ]; then
         log "Clonando el repositorio de Bazarr en la carpeta..."
