@@ -33,11 +33,9 @@ DATA_BASE_DIR="/var/lib"
 set -euo pipefail
 
 log() {
-    local function_name message timestamp
-    function_name="$1"
-    message="$2"
-    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-    echo "[$timestamp] [$scriptname] [$function_name] $message"
+    #función que permitirá que los mensajes de salida identifiquen al script, la función y fecha/hora de ejecución
+    local message="$1"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$0] [${FUNCNAME[1]}] $message"
 }
 
 
@@ -91,6 +89,7 @@ function configurar_directorios() {
     local grupo=$3
 
     local install_dir="${INSTALL_BASE_DIR}/${app_name}"
+    log "La ruta de instaación es $install_dir"
     local data_dir="${DATA_BASE_DIR}/${app_name}"
 
     if [ ! -d "${install_dir}" ]; then
@@ -156,7 +155,7 @@ function descargar_instalar_aplicacion() {
     log "Removing existing installation"
     rm -rf $bindir
     log "Installing..."
-    mv "${app^}" $installdir
+    mv "${app^}" $INSTALL_BASE_DIR
     chown "$app_uid":"$app_guid" "$bindir"
     chown -R "$app_uid":"$app_guid" "$bindir"
     log "Application installed"
@@ -180,7 +179,7 @@ After=syslog.target network.target
 User=${app_uid}
 Group=${app_guid}
 Type=simple
-ExecStart=${INSTALL_BASE_DIR}/${app}/${app} -nobrowser -data=${datadir}
+ExecStart=${INSTALL_BASE_DIR}/${app^}/${app^} -nobrowser -data=${datadir}
 TimeoutStopSec=20
 KillMode=process
 Restart=on-failure
@@ -217,10 +216,12 @@ function instalar_aplicacion() {
     detener_aplicacion "${app_name}"
     configurar_directorios "${app_name}" "${usuario}" "${grupo}"
     instalar_paquetes_requeridos "${app_prerequisites}"
-    descargar_instalar_aplicacion "${app_name}" "${app_branch}" "${INSTALL_BASE_DIR}/${app_name}" "${DATA_BASE_DIR}/${app_name}" "${usuario}" "${grupo}"
+    descargar_instalar_aplicacion "${app_name}" "${app_branch}" "${INSTALL_BASE_DIR}/${app_name^}" "${DATA_BASE_DIR}/${app_name}" "${usuario}" "${grupo}"
     configurar_servicio_systemd "${app_name}" "${INSTALL_BASE_DIR}/${app_name}" "${DATA_BASE_DIR}/${app_name}"
     iniciar_aplicacion "${app_name}"
 }
+
+
 
 function principal() {
     mostrar_info_version
@@ -229,22 +230,22 @@ function principal() {
     crear_usuario_grupo
 
     # Leer el archivo JSON y procesar cada aplicación
-    app_list=$(jq -c '.[]' apps.json)
-    for app_data in ${app_list}; do
-        app_name=$(echo "${app_data}" | jq -r '.name')
-        app_port=$(echo "${app_data}" | jq -r '.port')
-        app_prerequisites=$(echo "${app_data}" | jq -r '.prerequisites')
-        app_umask=$(echo "${app_data}" | jq -r '.umask')
-        app_branch=$(echo "${app_data}" | jq -r '.branch')
-        
-        instalar_aplicacion "${app_name}" "${app_port}" "${app_prerequisites}" "${app_umask}" "${app_branch}" "${app_uid}" "${app_guid}"
+    jq -c '.[]' apps.json | while read -r app_data; do
+        app_name=$(jq -r '.name' <<< "$app_data")
+        app_port=$(jq -r '.port' <<< "$app_data")
+        app_prerequisites=$(jq -r '.prerequisites' <<< "$app_data")
+        app_umask=$(jq -r '.umask' <<< "$app_data")
+        app_branch=$(jq -r '.branch' <<< "$app_data")
 
+        instalar_aplicacion "${app_name}" "${app_port}" "${app_prerequisites}" "${app_umask}" "${app_branch}" "${app_uid}" "${app_guid}"
     done
 
     log ""
     log ""
-    log "script finalizado"
+    log "Script finalizado"
 }
+
+
 
 principal
 
