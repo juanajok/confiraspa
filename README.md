@@ -22,7 +22,9 @@ Asegúrese de tener una Raspberry Pi con una distribución basada en Debian (por
 Uso
 ====
 1)  Clone este repositorio en su Raspberry Pi (preferiblemente en /opt): 
- 
+
+sudo mkdir -p /opt/confiraspa
+
 sudo git clone https://github.com/juanajok/confiraspa /opt/confiraspa
 
 2)  Navegue hasta el directorio del repositorio clonado:
