@@ -6,7 +6,11 @@
         "files_to_restore": [
             "lidarr.db",
             "config.xml"
-        ]
+        ],
+        "file_permissions": {
+            "lidarr.db": "644",
+            "config.xml": "664"
+        }
     },
     "radarr": {
         "backup_dir": "/media/Backup/radarr/scheduled",
@@ -15,7 +19,11 @@
         "files_to_restore": [
             "radarr.db",
             "config.xml"
-        ]
+        ],
+        "file_permissions": {
+            "radarr.db": "644",
+            "config.xml": "664"
+        }
     },
     "sonarr": {
         "backup_dir": "/media/Backup/sonarr/scheduled",
@@ -24,7 +32,11 @@
         "files_to_restore": [
             "sonarr.db",
             "config.xml"
-        ]
+        ],
+        "file_permissions": {
+            "sonarr.db": "644",
+            "config.xml": "664"
+        }
     },
     "prowlarr": {
         "backup_dir": "/media/Backup/prowlarr/scheduled",
@@ -33,7 +45,11 @@
         "files_to_restore": [
             "prowlarr.db",
             "config.xml"
-        ]
+        ],
+        "file_permissions": {
+            "prowlarr.db": "644",
+            "config.xml": "664"
+        }
     },
     "whisparr": {
         "backup_dir": "/media/Backup/whisparr/scheduled",
@@ -42,7 +58,10 @@
         "files_to_restore": [
             "whisparr2.db",
             "config.xml"
-        ]
+        ],
+        "file_permissions": {
+            "whisparr2.db": "644",
+            "config.xml": "664"
+        }
     }
-    
 }

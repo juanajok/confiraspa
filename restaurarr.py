@@ -5,6 +5,7 @@ import os
 import shutil
 import tarfile
 import zipfile
+import stat
 
 # Definir la ruta de los backups y la extensión
 BACKUP_DIR = "/media/Backup/"
@@ -23,7 +24,9 @@ for app, app_config in config.items():
     backup_dir = os.path.join(BACKUP_DIR, app_config["backup_dir"])
     restore_dir = app_config["restore_dir"]
     backup_ext = app_config["backup_ext"]
-    files = app_config.get("files", None)  # Lista opcional de ficheros a restaurar
+    files = app_config.get("files_to_restore", None)  # Lista opcional de ficheros a restaurar
+    permissions = app_config.get("permissions", {})
+
 
     # Encontrar el último backup disponible en el directorio
     backup_files = os.listdir(backup_dir)
@@ -49,6 +52,11 @@ for app, app_config in config.items():
         else:
             for file in files:
                 shutil.copy(os.path.join(backup_dir, file), restore_dir)
+
+    # Cambiar los permisos de los archivos restaurados
+    for file, perm in permissions.items():
+        file_path = os.path.join(restore_dir, file)
+        os.chmod(file_path, int(perm, 8))
 
     print(f"Aplicación {app} restaurada desde {backup_file}.")
 
