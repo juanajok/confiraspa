@@ -18,9 +18,9 @@ fi
 
 # Descargar y descomprimir Bazarr
 mkdir -p /opt/bazarr
-wget -P /opt/bazarr https://github.com/morpheus65535/bazarr/releases/latest/download/Bazarr-linux64.zip
-unzip -d /opt/bazarr /opt/bazarr/Bazarr-linux64.zip
-rm /opt/bazarr/Bazarr-linux64.zip
+wget -P /opt/bazarr https://github.com/morpheus65535/bazarr/releases/latest/download/bazarr.zip
+unzip -d /opt/bazarr /opt/bazarr/bazarr.zip
+rm /opt/bazarr/bazarr.zip
 
 # Instalar requisitos de Python
 python3 -m pip install -r /opt/bazarr/requirements.txt
