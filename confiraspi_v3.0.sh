@@ -39,6 +39,8 @@ leer_credenciales() {
     fi
 
     usuario="$SUDO_USER"
+    app_guid=$(id -gn "$usuario")
+
     credenciales=$(cat credenciales.json)
     contrasena=$(echo "$credenciales" | jq -r '.password')
     log "Info:  Se usuará el usuario $usuario que corre este script como credenciales para el resto de instaciones"
@@ -527,72 +529,78 @@ instalar_plex() {
 
 
 instalar_bazarr() {
-    log "Instalando dependencias de Bazarr..."
-    sudo apt install -y python3 python3-pip python3-venv libffi-dev zlib1g-dev libicu-dev libxml2-dev libxslt1-dev g++ git
 
+    #nstalar paquetes necesarios
+    log "Instalando dependencias de Bazarr..."
+    apt-get install -y libxml2-dev libxslt1-dev python3-dev python3-libxml2 python3-lxml unrar-free ffmpeg libatlas-base-dev -y
+
+    # Comprobar versión de Python instalada y actualizar si es necesario
+    python_version=$(python3 -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
+    if [ "$(echo "$python_version < 3.7" | bc)" -eq 1 ]; then
+    log  "Python $python_version no es compatible, se requiere versión 3.7 o superior. Actualizando Python..."
+    apt-get install -y python3.8
+    fi
+
+    # Descargar y descomprimir Bazarr
     log "Creando la carpeta de Bazarr..."
     mkdir -p /opt/bazarr
-    chown -R $usuario:$usuario /opt/bazarr
-    chmod 755 /opt/bazarr
+    log "Descargando el repositorio de Bazarr ..."
+    wget -P /opt/bazarr https://github.com/morpheus65535/bazarr/releases/latest/download/bazarr.zip
+    log "Descomprimiendo el repositorio de Bazarr en la carpeta..."
+    unzip -d /opt/bazarr /opt/bazarr/bazarr.zip
+    rm /opt/bazarr/bazarr.zip
 
-    if [ ! -d "/opt/bazarr/.git" ]; then
-        log "Clonando el repositorio de Bazarr en la carpeta..."
-        git clone https://github.com/morpheus65535/bazarr.git /opt/bazarr
-    else
-        log "El repositorio de Bazarr ya está clonado. No es necesario clonarlo de nuevo."
-    fi
-    chmod 777 /opt/bazarr
+    # Instalar requisitos de Python""
+    log "Instalando los requisitos de Python..."
+    python3 -m pip install -r /opt/bazarr/requirements.txt
 
-
-    log "Navegando a la carpeta de Bazarr..."
-    cd /opt/bazarr
-
-    if [ ! -d "venv" ]; then
-        log "Creando el entorno virtual de Python..."
-        python3 -m venv venv
-    else
-        log "El entorno virtual de Python ya existe. No es necesario crearlo de nuevo."
+    # En Raspberry Pi antiguas (ARMv6) numpy no es compatible
+    if [ "$(uname -m)" = "armv6l" ]; then
+    log "Raspberry Pi antigua detectada. Reemplazando numpy..."
+    python3 -m pip uninstall -y numpy
+    apt-get install -y python3-numpy
     fi
 
-    log "Activando el entorno virtual y actualizando las dependencias de Bazarr..."
-    source venv/bin/activate
-    pip install -r requirements.txt
-    deactivate
+    # Cambiar propiedad de la carpeta de Bazarr al usuario deseado
+    log " Cambiando propiedad y permisos de la carpeta de Bazarr..."
+    chown -R $usuario:$app_guid /opt/bazarr
+    chmod -R 777 /opt/bazarr
 
-    if [ ! -f "/etc/systemd/system/bazarr.service" ]; then
-        log "Creando el servicio de Bazarr..."
-        sudo bash -c "cat > /etc/systemd/system/bazarr.service << EOL
+
+# Crear el archivo de servicio de systemd
+cat << EOF | tee /etc/systemd/system/bazarr.service
 [Unit]
 Description=Bazarr Daemon
 After=syslog.target network.target
 
 [Service]
-User=$usuario
-Group=$usuario
-UMask=002
+WorkingDirectory=/opt/bazarr/
+User=${usuario}
+Group=${app_guid}
+UMask=0002
+Restart=on-failure
+RestartSec=5
 Type=simple
-ExecStart=/opt/bazarr/venv/bin/python3 /opt/bazarr/bazarr.py
-Restart=always
-RestartSec=15
+ExecStart=/usr/bin/python3 /opt/bazarr/bazarr.py
+KillSignal=SIGINT
+TimeoutStopSec=20
+SyslogIdentifier=bazarr
+ExecStartPre=/bin/sleep 30
 
 [Install]
 WantedBy=multi-user.target
-EOL"
-    else
-        log "El servicio de Bazarr ya existe. No es necesario crearlo de nuevo."
-    fi
+EOF
 
+    # Iniciar y habilitar el servicio
     log "Habilitando e iniciando el servicio de Bazarr..."
-    sudo systemctl enable bazarr.service
-    sudo systemctl start bazarr.service
-    sudo systemctl status bazarr.service
+    sudo systemctl start bazarr
+    sudo systemctl enable bazarr
+    sudo systemctl status bazarr
 
-
-    log "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
-    #volvemos al directorio donde está el script
-    cd "$script_path"
+    # Mensaje de confirmación y enlace para acceder a la interfaz web de Bazarr
+    echo "¡Bazarr ha sido instalado correctamente!"
+    echo "Accede a la interfaz web en http://<raspberry_pi_ip>:6767"
 }
-
 
 comandos_crontab() {
     log "Configurando comandos de crontab..."
