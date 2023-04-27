@@ -1,0 +1,22 @@
+{
+    "lidarr": {
+        "backup_dir": "/media/Backup/lidarr/scheduled",
+        "backup_ext": "zip",
+        "restore_dir": "/var/lib/lidarr"
+    },
+    "prowlarr": {
+        "backup_dir": "/media/Backup/prowlarr/scheduled",
+        "backup_ext": "zip",
+        "restore_dir": "/var/lib/prowlarr"
+    },
+    "radarr": {
+        "backup_dir": "/media/Backup/radarr/scheduled",
+        "backup_ext": "zip",
+        "restore_dir": "/var/lib/radarr"
+    },
+    "readarr": {
+        "backup_dir": "/media/Backup/readarr/scheduled",
+        "backup_ext": "zip",
+        "restore_dir": "/var/lib/readarr"
+    }
+}

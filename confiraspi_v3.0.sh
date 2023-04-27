@@ -532,7 +532,7 @@ instalar_bazarr() {
 
     log "Creando la carpeta de Bazarr..."
     mkdir -p /opt/bazarr
-    chown $usuario:$usuario /opt/bazarr
+    chown -R $usuario:$usuario /opt/bazarr
     chmod 755 /opt/bazarr
 
     if [ ! -d "/opt/bazarr/.git" ]; then
@@ -541,6 +541,8 @@ instalar_bazarr() {
     else
         log "El repositorio de Bazarr ya está clonado. No es necesario clonarlo de nuevo."
     fi
+    chmod 777 /opt/bazarr
+
 
     log "Navegando a la carpeta de Bazarr..."
     cd /opt/bazarr
@@ -583,6 +585,8 @@ EOL"
     log "Habilitando e iniciando el servicio de Bazarr..."
     sudo systemctl enable bazarr.service
     sudo systemctl start bazarr.service
+    sudo systemctl status bazarr.service
+
 
     log "Bazarr instalado. Visita http://<raspberry_pi_ip>:6767 para configurarlo."
     #volvemos al directorio donde está el script
