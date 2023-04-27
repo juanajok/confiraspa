@@ -58,6 +58,7 @@ La aplicación aMule heredará el usuario con que ejecutes el script y la contra
 6)  Ejecute el script:
 
 sudo bash ./confiraspi_v3.0.sh
+
 Siga las instrucciones en pantalla y espere a que se complete la ejecución del script.
 
 

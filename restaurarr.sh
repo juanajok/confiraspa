@@ -1,84 +1,60 @@
 #!/bin/bash
 
-# Función para imprimir mensajes con información de la función que los llama y la fecha y hora
-function log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') ${FUNCNAME[1]}: $1"
-}
+# Actualizar repositorios e instalar paquetes necesarios
+sudo apt-get update
+sudo apt-get install -y libxml2-dev libxslt1-dev python3-dev python3-libxml2 python3-lxml unrar-free ffmpeg libatlas-base-dev
 
-# Función para restaurar una aplicación
-function restore_app() {
-    local app_name=$1
-    local backup_dir=$2
-    local backup_ext=$3
-    local restore_dir=$4
+# Comprobar versión de Python instalada y actualizar si es necesario
+python_version=$(python3 -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
+if [ "$(echo "$python_version >= 3.7" | bc)" -eq 0 ]; then
+  echo "Python $python_version no es compatible, se requiere versión 3.7 o superior. Actualizando Python..."
+  sudo apt-get install -y python3.8
+fi
 
-    # Verificar si la ruta de backup existe y contiene archivos
-    if [ ! -d "$backup_dir" ] || [ ! "$(ls -A $backup_dir)" ]; then
-        log "La ruta de backup para $app_name no existe o no contiene archivos."
-        return 1
-    fi
-
-    # Obtener el archivo más reciente en la ruta de backup
-    local backup_file=$(ls -t "$backup_dir"/*"$backup_ext" | head -1)
-
-    # Verificar si el archivo de backup existe
-    if [ ! -f "$backup_file" ]; then
-        log "El archivo de backup para $app_name no existe."
-        return 1
-    fi
-
-    log "Restaurando $app_name desde $backup_file"
-
-    # Detener el servicio
-    systemctl stop "$app_name".service
-
-    # Hacer una copia de seguridad de los archivos originales
-    local app_dir=$(jq -r --arg app_name "$app_name" '.[$app_name].app_dir' restore_apps.json)
-    cp "$app_dir"/"$app_name".db "$app_dir"/"$app_name".db.bak
-    cp "$app_dir"/config.xml "$app_dir"/config.xml.bak
+# Descargar y descomprimir Bazarr
+csudo mkdir -p /opt/bazarr
+sudo wget -P /opt/bazarr https://github.com/morpheus65535/bazarr/releases/latest/download/Bazarr-linux64.zip
+sudo unzip -d /opt/bazarr Bazarr-linux64.zip
+sudo rm /opt/bazarr/Bazarr-linux64.zip
 
 
-    # Descomprimir el backup en el directorio temporal
-    local tmp_dir="$restore_dir/$app_name"
-    mkdir -p "$tmp_dir"
-    unzip "$backup_file" -d "$tmp_dir"
+# Instalar requisitos de Python
+sudo python3 -m pip install -r requirements.txt
 
-    # Copiar los archivos del backup a la ubicación original
-    cp "$tmp_dir"/"$app_name".db "$app_dir"/"$app_name".db
-    cp "$tmp_dir"/config.xml "$app_dir"/config.xml
+# En Raspberry Pi antiguas (ARMv6) numpy no es compatible
+if [ "$(uname -m)" = "armv6l" ]; then
+  echo "Raspberry Pi antigua detectada. Reemplazando numpy..."
+  sudo python3 -m pip uninstall -y numpy
+  sudo apt-get install -y python3-numpy
+fi
 
-    # Asignar los permisos adecuados a los archivos
-    local sudo_user=$(whoami)
-    local sudo_user_group=$(id -gn $sudo_user)
-    chown -R "$sudo_user":"$sudo_user_group" "$app_dir"/"$app_name"
-    chmod 755 "$app_dir"/"$app_name".db
-    chmod 644 "$app_dir"/config.xml
+# Cambiar propiedad de la carpeta de Bazarr al usuario deseado
+sudo chown -R $USER:$USER /opt/bazarr
 
-    # Iniciar el servicio
-    systemctl start "$app_name".service
+# Crear el archivo de servicio de systemd
+sudo bash -c 'cat << EOF > /etc/systemd/system/bazarr.service
+[Unit]
+Description=Bazarr Daemon
+After=syslog.target network.target
 
-    log "$app_name restaurado exitosamente"
-}
+[Service]
+WorkingDirectory=/opt/bazarr/
+User=$USER
+Group=$USER
+UMask=0002
+Restart=on-failure
+RestartSec=5
+Type=simple
+ExecStart=/usr/bin/python3 /opt/bazarr/bazarr.py
+KillSignal=SIGINT
+TimeoutStopSec=20
+SyslogIdentifier=bazarr
+ExecStartPre=/bin/sleep 30
 
-# Función principal
-function main() {
-    # Verificar si el archivo restore_apps.json existe
-    if [ ! -f "restore_apps.json" ]; then
-        log "El archivo restore_apps.json no existe."
-        return 1
-    fi
+[Install]
+WantedBy=multi-user.target
+EOF'
 
-    # Configuración de las aplicaciones a restaurar
-    apps=($(jq -r 'keys[]' restore_apps.json))
-
-    for app_name in "${apps[@]}"
-    do
-        backup_dir=$(jq -r --arg app_name "$app_name" '.[$app_name].backup_dir' restore_apps.json)
-        backup_ext=$(jq -r --arg app_name "$app_name" '.[$app_name].backup_ext' restore_apps.json)
-        restore_dir=$(jq -r --arg app_name "$app_name" '.[$app_name].restore_dir' restore_apps.json)
-
-        restore_app "$app_name" "$backup_dir" "$backup_ext" "$restore_dir"
-    done
-}
-
-
+# Iniciar y habilitar el servicio
+sudo systemctl start bazarr
+sudo systemctl enable bazarr
