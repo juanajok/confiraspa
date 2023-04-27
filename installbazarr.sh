@@ -6,7 +6,6 @@ app_guid=$(id -gn "$usuario")
 # Cambiar a usuario root
 
 # Actualizar repositorios e instalar paquetes necesarios
-apt-get update
 apt-get install -y libxml2-dev libxslt1-dev python3-dev python3-libxml2 python3-lxml unrar-free ffmpeg libatlas-base-dev -y
 
 # Comprobar versión de Python instalada y actualizar si es necesario
