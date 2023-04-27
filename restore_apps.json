@@ -2,21 +2,47 @@
     "lidarr": {
         "backup_dir": "/media/Backup/lidarr/scheduled",
         "backup_ext": "zip",
-        "restore_dir": "/var/lib/lidarr"
-    },
-    "prowlarr": {
-        "backup_dir": "/media/Backup/prowlarr/scheduled",
-        "backup_ext": "zip",
-        "restore_dir": "/var/lib/prowlarr"
+        "restore_dir": "/var/lib/lidarr",
+        "files_to_restore": [
+            "lidarr.db",
+            "config.xml"
+        ]
     },
     "radarr": {
         "backup_dir": "/media/Backup/radarr/scheduled",
         "backup_ext": "zip",
-        "restore_dir": "/var/lib/radarr"
+        "restore_dir": "/var/lib/radarr",
+        "files_to_restore": [
+            "radarr.db",
+            "config.xml"
+        ]
     },
-    "readarr": {
-        "backup_dir": "/media/Backup/readarr/scheduled",
+    "sonarr": {
+        "backup_dir": "/media/Backup/sonarr/scheduled",
         "backup_ext": "zip",
-        "restore_dir": "/var/lib/readarr"
+        "restore_dir": "/var/lib/sonarr",
+        "files_to_restore": [
+            "sonarr.db",
+            "config.xml"
+        ]
+    },
+    "prowlarr": {
+        "backup_dir": "/media/Backup/prowlarr/scheduled",
+        "backup_ext": "zip",
+        "restore_dir": "/var/lib/prowlarr",
+        "files_to_restore": [
+            "prowlarr.db",
+            "config.xml"
+        ]
+    },
+    "whisparr": {
+        "backup_dir": "/media/Backup/whisparr/scheduled",
+        "backup_ext": "zip",
+        "restore_dir": "/var/lib/whisparr",
+        "files_to_restore": [
+            "whisparr2.db",
+            "config.xml"
+        ]
     }
+    
 }
