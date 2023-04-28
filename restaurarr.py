@@ -4,6 +4,8 @@ import shutil
 import tarfile
 import zipfile
 import subprocess
+import time
+
 
 
 
@@ -37,6 +39,17 @@ def stop_app(app):
     try:
         subprocess.run(["sudo", "systemctl", "stop", app], check=True)
         print(f"La aplicación {app} ha sido detenida exitosamente.")
+        
+        # Esperar a que la aplicación se detenga
+        while True:
+            process = subprocess.Popen(["systemctl", "is-active", app], stdout=subprocess.PIPE)
+            output = process.communicate()[0].decode("utf-8").strip()
+            if output == "inactive":
+                print(f"La aplicación {app} se ha detenido exitosamente.")
+                break
+            else:
+                print(f"Esperando a que la aplicación {app} se detenga...")
+                time.sleep(5)
     except subprocess.CalledProcessError:
         print(f"Error al detener la aplicación {app}.")
 
