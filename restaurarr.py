@@ -5,6 +5,8 @@ import tarfile
 import zipfile
 import subprocess
 import time
+import logging
+
 
 
 
@@ -69,87 +71,100 @@ def restore_app(app, app_config):
     backup_ext = app_config["backup_ext"]
     restore_dir = app_config["restore_dir"]
     files = app_config.get("files_to_restore", [])
-    permissions = app_config.get("permissions", {})
+    permissions = app_config.get("file_permissions", {})
+
+    logger = logging.getLogger(app)
 
     # Detener la aplicación antes de la restauración
     stop_app(app)
 
     # Verificar si la carpeta de restauración existe antes de continuar
     if not os.path.exists(restore_dir):
-        print(f"No existe la carpeta de restauración '{restore_dir}', creando...")
+        logger.info(f"No existe la carpeta de restauración '{restore_dir}', creando...")
         os.makedirs(restore_dir)
-        print(f"Carpeta de restauración '{restore_dir}' creada exitosamente.")
+        logger.info(f"Carpeta de restauración '{restore_dir}' creada exitosamente.")
 
     # Crear la carpeta backup_orig y hacer una copia de los archivos originales
     backup_orig_dir = os.path.join(restore_dir, "backup_orig")
     if not os.path.exists(backup_orig_dir):
-        print(f"No existe la carpeta '{backup_orig_dir}', creando...")
+        logger.info(f"No existe la carpeta '{backup_orig_dir}', creando...")
         os.makedirs(backup_orig_dir)
-        print(f"Carpeta '{backup_orig_dir}' creada exitosamente.")
-    print("Haciendo una copia de los archivos originales en la carpeta 'backup_orig'...")
+        logger.info(f"Carpeta '{backup_orig_dir}' creada exitosamente.")
+    logger.info("Haciendo una copia de los archivos originales en la carpeta 'backup_orig'...")
     for file in files:
         src_path = os.path.join(restore_dir, file)
         dst_path = os.path.join(backup_orig_dir, file)
         if os.path.exists(src_path):
             shutil.copy(src_path, dst_path)
-            print(f"Archivo '{file}' copiado exitosamente a la carpeta 'backup_orig'.")
+            logger.info(f"Archivo '{file}' copiado exitosamente a la carpeta 'backup_orig'.")
         else:
-            print(f"No se encontró el archivo '{file}' en la carpeta de restauración.")
+            logger.info(f"No se encontró el archivo '{file}' en la carpeta de restauración.")
 
     # Encontrar el último backup disponible en el directorio de backup
     backup_file = get_latest_backup(backup_dir, backup_ext)
     if backup_file is None:
-        print(f"No se encontraron backups para la aplicación '{app}'.")
+        logger.info(f"No se encontraron backups para la aplicación '{app}'.")
         return
-    print(f"Último backup encontrado para la aplicación '{app}': '{backup_file}'.")
-    print(f"La extensión del archivo de backup es '{backup_ext}'.")
+    logger.info(f"Último backup encontrado para la aplicación '{app}': '{backup_file}'.")
+    logger.info(f"La extensión del archivo de backup es '{backup_ext}'.")
 
 
     # Restaurar los archivos desde el backup en la carpeta de restauración
-    print(f"Restaurando los archivos de la aplicación '{app}'...")
+    logger.info(f"Restaurando los archivos de la aplicación '{app}'...")
     if backup_ext.endswith("zip"):
         with zipfile.ZipFile(backup_file, "r") as f:
-            print(f"La extensión del archivo de backup es '{backup_ext}'.")
-            print(f"Archivos en el archivo zip: {f.namelist()}")
+            logger.info(f"La extensión del archivo de backup es '{backup_ext}'.")
+            logger.info(f"Archivos en el archivo zip: {f.namelist()}")
             for file in files:
                 try:
                     f.extract(file, restore_dir)
-                    print(f"Archivo '{file}' restaurado exitosamente.")
+                    logger.info(f"Archivo '{file}' restaurado exitosamente.")
                 except KeyError:
-                    print(f"No se encontró el archivo '{file}' en el backup '{backup_file}'.")
+                    logger.info(f"No se encontró el archivo '{file}' en el backup '{backup_file}'.")
 
     elif backup_ext.endswith(("tar", "tar.gz", "tgz")):
         with tarfile.open(backup_file, "r") as f:
             for file in files:
                 try:
                     f.extract(file, restore_dir)
-                    print(f"Archivo '{file}' restaurado exitosamente.")
+                    logger.info(f"Archivo '{file}' restaurado exitosamente.")
                 except KeyError:
-                    print(f"No se encontró el archivo '{file}' en el backup '{backup_file}'.")
+                    logger.info(f"No se encontró el archivo '{file}' en el backup '{backup_file}'.")
     else:
         for file in files:
             src_path = os.path.join(backup_dir, file)
             dst_path = os.path.join(restore_dir, file)
             if os.path.exists(src_path):
                 shutil.copy(src_path, dst_path)
-                print(f"Archivo '{file}' restaurado exitosamente.")
+                logger.info(f"Archivo '{file}' restaurado exitosamente.")
             else:
-                print(f"No se encontró el archivo '{file}' en el directorio de backup.")
+                logger.info(f"No se encontró el archivo '{file}' en el directorio de backup.")
 
     # Cambiar los permisos de los archivos restaurados
     for file, perm in permissions.items():
         file_path = os.path.join(restore_dir, file)
+        logger.info (file_path) 
+        logger.info (perm)
+
         if os.path.isfile(file_path):
-            os.chmod(file_path, int(perm, 8))
+            os.chmod(file_path, int(perm,8))
+            logger.info(f"se han cambiado los permisos a {perm} para el archivo {file_path}")
+
         else:
-            print(f"No se pudo cambiar los permisos para el archivo {file_path}.")
+            logger.info(f"No se pudo cambiar los permisos a {perm} para el archivo {file_path}")
 
 
-    print(f"Aplicación {app} restaurada desde {backup_file}.")
+    logger.info(f"Aplicación {app} restaurada desde {backup_file}.")
 
 
 
 def main():
+    #definimos los logs
+    logging.basicConfig(
+        filename="restore_apps.log",
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=logging.INFO
+    )
     # Cargar la configuración desde el archivo JSON
     config = load_config("restore_apps.json")
 
@@ -161,6 +176,7 @@ def main():
     start_app(app)
 
     print("Proceso de restauración finalizado con éxito.")
+    print("Es recomendable reiniciar la raspberry para que sonarr coja los cambios")
 
 
 if __name__ == '__main__':

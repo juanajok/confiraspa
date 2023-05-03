@@ -8,8 +8,8 @@
             "config.xml"
         ],
         "file_permissions": {
-            "lidarr.db": "644",
-            "config.xml": "664"
+            "lidarr.db": "775",
+            "config.xml": "775"
         }
     },
     "radarr": {
@@ -21,8 +21,8 @@
             "config.xml"
         ],
         "file_permissions": {
-            "radarr.db": "644",
-            "config.xml": "664"
+            "radarr.db": "775",
+            "config.xml": "775"
         }
     },
     "sonarr": {
@@ -34,8 +34,8 @@
             "config.xml"
         ],
         "file_permissions": {
-            "sonarr.db": "644",
-            "config.xml": "664"
+            "sonarr.db": "775",
+            "config.xml": "775"
         }
     },
     "prowlarr": {
@@ -47,8 +47,8 @@
             "config.xml"
         ],
         "file_permissions": {
-            "prowlarr.db": "644",
-            "config.xml": "664"
+            "prowlarr.db": "775",
+            "config.xml": "775"
         }
     },
     "whisparr": {
@@ -60,8 +60,19 @@
             "config.xml"
         ],
         "file_permissions": {
-            "whisparr2.db": "644",
-            "config.xml": "664"
+            "whisparr2.db": "775",
+            "config.xml": "775"
+        }
+    },
+    "Plex": {
+        "backup_dir": "/media/Backup/plexmediaserver",
+        "backup_ext": "",
+        "restore_dir": "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/preferences.xml",
+        "files_to_restore": [
+            "preferences.xml",
+        ],
+        "file_permissions": {
+            "whisparr2.db": "775",
+            "config.xml": "775"
         }
     }
-}
