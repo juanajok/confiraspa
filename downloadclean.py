@@ -194,7 +194,8 @@ def remove_empty_directories_recursively(top_directory):
 
 def main():
     # Load directories from JSON
-    with open("directories.json", "r") as f:
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "directories.json")
+    with open(config_path, "r") as f:
         directories = json.load(f)
 
     download_dir = directories.get("download_dir")
