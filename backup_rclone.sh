@@ -13,12 +13,12 @@
 # Variables
 SCRIPT_DIR="$(dirname "$0")"
 CONFIG_FILE="$SCRIPT_DIR/backup_rclone_config.json"
-LOG_FILE="$SCRIPT_DIR/backup_rclone.log"
+LOG_FILE="$SCRIPT_DIR/logs/backup_rclone_$(date +'%Y-%m-%d_%H-%M-%S').log"
 
 # Funciones
 log_message() {
     local message="$1"
-    echo "$(date +'%Y-%m-%d %H:%M:%S') - $message" | tee -a "$LOG_FILE"
+    echo "$(date +'%Y-%m-%d %H:%M:%S') - $0 - $message" >> "$LOG_FILE"
 }
 
 # Comenzar

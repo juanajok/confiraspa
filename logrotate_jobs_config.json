@@ -1,0 +1,4 @@
+[
+    {"job": "backup_rclone", "days": 30},
+    {"job": "backup_rsync", "days": 7}
+]

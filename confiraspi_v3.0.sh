@@ -598,8 +598,8 @@ EOF
     sudo systemctl status bazarr
 
     # Mensaje de confirmación y enlace para acceder a la interfaz web de Bazarr
-    echo "¡Bazarr ha sido instalado correctamente!"
-    echo "Accede a la interfaz web en http://<raspberry_pi_ip>:6767"
+    log "¡Bazarr ha sido instalado correctamente!"
+    log "Accede a la interfaz web en http://<raspberry_pi_ip>:6767"
 }
 
 instalar_rclone(){
@@ -657,6 +657,53 @@ instalar_rclone(){
     log "rclone has been installed. Run 'rclone config' to start setup."
 }
 
+setup_logrotate_from_json() {
+
+    # Directorio donde se encuentran los logs
+    LOG_DIR="$(pwd)/logs"
+
+    # Archivo de configuración de los trabajos en formato JSON
+    JOBS_CONFIG="logrotate_jobs_config.json"
+
+    # Archivo de configuración de logrotate
+    LOGROTATE_CONFIG="/etc/logrotate.d/my_jobs"
+
+    # Verificar si el archivo jobs_config.json existe
+    if [ ! -f "$JOBS_CONFIG" ]; then
+        log "El archivo $JOBS_CONFIG no existe."
+        exit 1
+    fi
+
+    # Comprobar si el archivo de configuración de logrotate ya existe
+    if [ -f "$LOGROTATE_CONFIG" ]; then
+        log "El archivo de configuración de logrotate ya existe. Saliendo para evitar sobrescribir."
+        exit 0
+    fi
+
+    log "Generando configuración de logrotate..."
+
+    # Leer el archivo jobs_config.json y generar la configuración de logrotate
+    length=$(jq '. | length' "$JOBS_CONFIG")
+    for (( i=0; i<$length; i++ )); do
+        job=$(jq -r ".[$i].job" "$JOBS_CONFIG")
+        days=$(jq -r ".[$i].days" "$JOBS_CONFIG")
+
+        cat <<EOL >> "$LOGROTATE_CONFIG"
+$LOG_DIR/${job}_*.log {
+    daily
+    rotate $days
+    compress
+    missingok
+    notifempty
+    create 0644 $usuario $usuario
+}
+EOL
+done
+
+    log "Configuración de logrotate generada en $LOGROTATE_CONFIG"
+
+}
+
 comandos_crontab() {
     log "Configurando comandos de crontab..."
     #volvemos al directorio donde está el script
@@ -705,6 +752,7 @@ main() {
     instalar_bazarr
     instalar_amule
     instalar_rclone
+    setup_logrotate_from_json
     comandos_crontab
     log "Info: script finalizado, por favor reinicia para que los cambios tengan efecto"
 }
