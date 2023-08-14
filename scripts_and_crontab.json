@@ -14,5 +14,9 @@
   {
     "script": "SCRIPT_PATH_PLACEHOLDER/downloadclean.py",
     "crontab_entry": "0 5 * * * /usr/bin/python3"
+  },
+  {
+    "script": "SCRIPT_PATH_PLACEHOLDER/backup_rclone.sh",
+    "crontab_entry":  "0 4 * * *"
   }
 ]

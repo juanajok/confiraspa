@@ -7,7 +7,16 @@ import subprocess
 import time
 import logging
 
-
+# Script Name: restaurarr.py
+# Description: Script para restaurar aplicaciones desde backups usando archivos JSON de configuración.
+# Author: Juan José Hipólito
+# Version: 1.1.0
+# Date: 2023-08-07
+# License: GNU
+# Usage: Ejecuta el script manualmente o programa su ejecución en crontab.
+# Dependencies: Python 3, json, os, shutil, tarfile, zipfile, subprocess, time, logging.
+# Notes: Asegúrate de que las rutas de origen y destino estén montadas antes de ejecutar este script.
+#        Es recomendable reiniciar la raspberry después de la restauración para que las aplicaciones reconozcan los cambios.
 
 
 

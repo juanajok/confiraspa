@@ -602,6 +602,61 @@ EOF
     echo "Accede a la interfaz web en http://<raspberry_pi_ip>:6767"
 }
 
+instalar_rclone(){
+    log "Instalamos rclone para hacer sincronizar discos duros con la nube"
+
+    # Define the URL for the latest rclone
+    if [ "$1" = "beta" ]; then
+        download_link="https://beta.rclone.org/rclone-beta-latest-linux-arm.zip"
+    else
+        download_link="https://downloads.rclone.org/rclone-current-linux-arm.zip"
+    fi
+
+    # Create a temporary directory and change to it
+    tmp_dir=$(mktemp -d)
+    cd "$tmp_dir"
+
+    # Download and unzip rclone
+    log "Downloading rclone..."
+    curl -OfsS "$download_link"
+    log "Unzipping rclone..."
+    unzip -a *.zip -d rclone_tmp
+
+    # Check if rclone is already installed
+    if command -v rclone &>/dev/null; then
+        log "rclone is already installed, checking for updates..."
+        current_version=$(rclone --version | head -n 1)
+        latest_version=$(rclone_tmp/*/rclone --version | head -n 1)
+        if [ "$current_version" = "$latest_version" ]; then
+            log "rclone is up-to-date."
+            rm -r "$tmp_dir"
+            exit 0
+        else
+            log "Updating rclone..."
+        fi
+    else
+        log "Installing rclone..."
+    fi
+
+    # Move rclone to your $PATH
+    sudo cp rclone_tmp/*/rclone /usr/bin/
+    sudo chown root:root /usr/bin/rclone
+    sudo chmod 755 /usr/bin/rclone
+
+    # Check if mandb command is available for manpage installation
+    if [ -x "$(command -v mandb)" ]; then
+        log "Installing rclone manpage..."
+        sudo mkdir -p /usr/local/share/man/man1
+        sudo cp rclone_tmp/*/rclone.1 /usr/local/share/man/man1/
+        sudo mandb
+    fi
+
+    # Clean up
+    rm -r "$tmp_dir"
+
+    log "rclone has been installed. Run 'rclone config' to start setup."
+}
+
 comandos_crontab() {
     log "Configurando comandos de crontab..."
     #volvemos al directorio donde está el script
@@ -632,8 +687,6 @@ comandos_crontab() {
     log "Configuración de comandos de crontab completada."
 }
 
-
-
 main() {
     # Llamadas a las funciones
     actualizar_raspi
@@ -651,6 +704,7 @@ main() {
     instalar_plex
     instalar_bazarr
     instalar_amule
+    instalar_rclone
     comandos_crontab
     log "Info: script finalizado, por favor reinicia para que los cambios tengan efecto"
 }
