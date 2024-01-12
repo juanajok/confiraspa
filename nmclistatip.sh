@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuraciones deseadas
-INTERFAZ="eth0" # Cambiar a wlan0 para Wi-Fi
+CONEXION="Wired connection 1" # Cambiar a wlan0 para Wi-Fi
 IP_ESTATICA="192.168.1.76"
 GATEWAY="192.168.1.1"
 DNS="8.8.8.8,8.8.4.4" # Separados por comas sin espacios
@@ -13,9 +13,9 @@ if [ "$(id -u)" != "0" ]; then
    exit 1
 fi
 
-# Verifica la existencia de la interfaz
-if ! nmcli device status | grep -q "$INTERFAZ"; then
-    echo "La interfaz $INTERFAZ no existe o no está activa." >&2
+# Verifica la existencia de la CONEXION
+if ! nmcli device status | grep -q "$CONEXION"; then
+    echo "La CONEXION $CONEXION no existe o no está activa." >&2
     exit 1
 fi
 
@@ -56,9 +56,9 @@ if ! validar_ip_mascara "$IP_ESTATICA/$MASCARA" || ! validar_gateway "$GATEWAY" 
 fi
 
 # Obtiene la configuración actual
-ACTUAL_IP=$(nmcli -g IP4.ADDRESS dev show $INTERFAZ)
-ACTUAL_GATEWAY=$(nmcli -g IP4.GATEWAY dev show $INTERFAZ)
-ACTUAL_DNS=$(nmcli -g IP4.DNS dev show $INTERFAZ | paste -sd "," -)
+ACTUAL_IP=$(nmcli -g IP4.ADDRESS dev show $CONEXION)
+ACTUAL_GATEWAY=$(nmcli -g IP4.GATEWAY dev show $CONEXION)
+ACTUAL_DNS=$(nmcli -g IP4.DNS dev show $CONEXION | paste -sd "," -)
 
 # Compara la configuración actual con la deseada
 if [ "$ACTUAL_IP" = "$IP_ESTATICA/$MASCARA" ] && [ "$ACTUAL_GATEWAY" = "$GATEWAY" ] && [ "$ACTUAL_DNS" = "$DNS" ]; then
@@ -67,15 +67,15 @@ if [ "$ACTUAL_IP" = "$IP_ESTATICA/$MASCARA" ] && [ "$ACTUAL_GATEWAY" = "$GATEWAY
 fi
 
 # Aplica la configuración
-if nmcli con mod "$INTERFAZ" ipv4.addresses "$IP_ESTATICA/$MASCARA" &&
-   nmcli con mod "$INTERFAZ" ipv4.gateway "$GATEWAY" &&
-   nmcli con mod "$INTERFAZ" ipv4.dns "$DNS" &&
-   nmcli con mod "$INTERFAZ" ipv4.method manual; then
+if nmcli con mod "$CONEXION" ipv4.addresses "$IP_ESTATICA/$MASCARA" &&
+   nmcli con mod "$CONEXION" ipv4.gateway "$GATEWAY" &&
+   nmcli con mod "$CONEXION" ipv4.dns "$DNS" &&
+   nmcli con mod "$CONEXION" ipv4.method manual; then
 
-    # Reinicia la interfaz de red para aplicar los cambios
-    nmcli con down "$INTERFAZ" && nmcli con up "$INTERFAZ"
-    echo "Configuración de IP estática aplicada a $INTERFAZ"
+    # Reinicia la CONEXION de red para aplicar los cambios
+    nmcli con down "$CONEXION" && nmcli con up "$CONEXION"
+    echo "Configuración de IP estática aplicada a $CONEXION"
 else
-    echo "Error al aplicar la configuración a $INTERFAZ" >&2
+    echo "Error al aplicar la configuración a $CONEXION" >&2
     exit 1
 fi
