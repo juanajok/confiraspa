@@ -42,7 +42,8 @@ validar_gateway() {
 # Función para validar los servidores DNS
 validar_dns() {
     local dns=$1
-    if ! echo $dns | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}(,[0-9]{1,3}\.){3}[0-9]{1,3}$'; then
+    # Esta expresión regular verifica uno o más servidores DNS válidos, separados por comas.
+    if ! echo $dns | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}(,([0-9]{1,3}\.){3}[0-9]{1,3})*$'; then
         echo "Formato de servidores DNS no válido: $dns" >&2
         return 1
     fi
