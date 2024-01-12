@@ -69,7 +69,7 @@
         "backup_ext": "",
         "restore_dir": "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Preferences.xml",
         "files_to_restore": [
-            "preferences.xml",
+            "preferences.xml"
         ],
         "file_permissions": {
             "whisparr2.db": "775",
@@ -81,10 +81,11 @@
         "backup_ext": "",
         "restore_dir": "/home/pi/.config/rclone",
         "files_to_restore": [
-            "rclone.conf",
+            "rclone.conf"
         ],
         "file_permissions": {
             "whisparr2.db": "600",
             "config.xml": "600"
         }
     }
+}
