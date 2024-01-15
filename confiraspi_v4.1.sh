@@ -51,7 +51,7 @@ leer_credenciales() {
 
 actualizar_raspi() {
     log "1) Actualizando la Raspberry Pi..."
-    sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y && sudo apt clean 
+    sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y && sudo apt clean
     #instalo jq para tratar ficheros json
     if ! command -v jq > /dev/null 2>&1; then
         sudo apt-get install jq -y
@@ -62,7 +62,6 @@ actualizar_raspi() {
     # Añade el comando de actualización al crontab del usuario actual
     (crontab -l 2>/dev/null | grep -qF -- "$actualizacion_cmd") || (crontab -l 2>/dev/null; echo "$actualizacion_cmd") | crontab -
 }
-
 
 
 configurar_ip_estatica() {
@@ -244,60 +243,44 @@ instalar_xrdp() {
     log "XRDP instalado correctamente."
 }
 
-
 instalar_transmission() {
     log "8) Instalando Transmission..."
 
     # Verificar si el paquete transmission-daemon está instalado
     if ! dpkg -s transmission-daemon >/dev/null 2>&1; then
         log "El paquete transmission-daemon no está instalado. Instalando..."
-        sudo apt-get install transmission-daemon -y || { log "Error al instalar transmission-daemon."; return 1; }
+        sudo apt-get install -y transmission-daemon
     else
         log "El paquete transmission-daemon ya está instalado. Continuando..."
     fi
 
-    # Detenemos el servicio de transmission para poder modificar el fichero de configuración
-    sudo systemctl stop transmission-daemon
-
-    # Verificar si el archivo transmission.json está presente
-    if [ ! -f transmission.json ]; then
-        log "Error: El archivo transmission.json no se encuentra."
-        return 1
-    fi
-
-    # Leer los valores de configuración de transmission.json
-    local config=$(cat transmission.json)
-    local download_dir=$(echo "$config" | jq -r '.["download-dir"]')
-    local incomplete_dir=$(echo "$config" | jq -r '.["incomplete-dir"]')
-    local incomplete_dir_enabled=$(echo "$config" | jq -r '.["incomplete-dir-enabled"]')
-    local rpc_auth_required=$(echo "$config" | jq -r '.["rpc-authentication-required"]')
-    local rpc_enabled=$(echo "$config" | jq -r '.["rpc-enabled"]')
-    local rpc_password=$(echo "$config" | jq -r '.["rpc-password"]')
-    local rpc_whitelist_enabled=$(echo "$config" | jq -r '.["rpc-whitelist-enabled"]')
+    # paramos el servicio de transmission para poder modificar el fichero de configuración
+    sudo service transmission-daemon stop
 
     # Hacer una copia de seguridad del archivo de configuración de Transmission
-    CONFIG_FILE="/etc/transmission-daemon/settings.json"
-    if [ -f "$CONFIG_FILE" ]; then
-        sudo cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-        log "Copia de seguridad del archivo de configuración realizada."
-
-        # Modificamos el archivo de configuración con jq
-        sudo jq --arg download_dir "$download_dir" \
-                --arg incomplete_dir "$incomplete_dir" \
-                --argjson incomplete_dir_enabled "$incomplete_dir_enabled" \
-                --argjson rpc_auth_required "$rpc_auth_required" \
-                --argjson rpc_enabled "$rpc_enabled" \
-                --arg rpc_password "$rpc_password" \
-                --argjson rpc_whitelist_enabled "$rpc_whitelist_enabled" \
-        '.["download-dir"]=$download_dir | .["incomplete-dir"]=$incomplete_dir | .["incomplete-dir-enabled"]=$incomplete_dir_enabled | .["rpc-authentication-required"]=$rpc_auth_required | .["rpc-enabled"]=$rpc_enabled | .["rpc-password"]=$rpc_password | .["rpc-whitelist-enabled"]=$rpc_whitelist_enabled' "$CONFIG_FILE" | sudo sponge "$CONFIG_FILE" || { log "Error al modificar el archivo de configuración de Transmission."; return 1; }
+    CONFIG_FILE="/var/lib/transmission-daemon/info/settings.json"
+    if [ -f $CONFIG_FILE ]; then
+    sudo jq --arg temp_dir "$TEMP_DIR" --arg download_dir "$DOWNLOAD_DIR" \
+    '.["incomplete-dir"]=$temp_dir | .["download-dir"]=$download_dir | .["rpc-username"]="transmission" | .["rpc-password"]="transmission" | .["rpc-whitelist-enabled"]=true | .["rpc-whitelist"]="192.168.*.*"' $CONFIG_FILE | sudo sponge $CONFIG_FILE
     else
-    log "No se encontró el archivo de configuración de Transmission."
-    return 1
+        log "No se encontró el archivo de configuración de Transmission. Continuando..."
     fi
+
+    # Leer el directorio temporal y el directorio de descargas completadas de amule_directories.json
+    if [ -f amule_directories.json ]; then
+        TEMP_DIR=$(jq -r '.temp_directory' amule_directories.json)
+        DOWNLOAD_DIR=$(jq -r '.incoming_directory' amule_directories.json)
+    else
+        log "No se encontró el archivo amule_directories.json. "
+        exit
+    fi
+
+
     # Reiniciar el servicio de Transmission
-    sudo systemctl start transmission-daemon || { log "Error al reiniciar el servicio de Transmission."; return 1; }
+    sudo service transmission-daemon restart
     log "Servicio de Transmission reiniciado."
 }
+
 
 instalar_mono() {
     log "9) Instalando Mono..."
@@ -551,46 +534,46 @@ instalar_plex() {
 
 
 instalar_bazarr() {
+
+    #nstalar paquetes necesarios
     log "Instalando dependencias de Bazarr..."
-    apt-get install -y libxml2-dev libxslt1-dev python3-dev python3-libxml2 python3-lxml unrar-free ffmpeg libatlas-base-dev || { log "Error al instalar las dependencias necesarias."; return 1; }
+    apt-get install -y libxml2-dev libxslt1-dev python3-dev python3-libxml2 python3-lxml unrar-free ffmpeg libatlas-base-dev -y
 
     # Comprobar versión de Python instalada y actualizar si es necesario
     python_version=$(python3 -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
     if [ "$(echo "$python_version < 3.7" | bc)" -eq 1 ]; then
-        log "Python $python_version no es compatible, se requiere versión 3.7 o superior. Actualizando Python..."
-        apt-get install -y python3.8 || { log "Error al instalar Python 3.8."; return 1; }
-    fi
-
-    # Verificar si unzip está instalado
-    if ! command -v unzip > /dev/null; then
-        apt-get install -y unzip || { log "Error al instalar unzip."; return 1; }
+    log  "Python $python_version no es compatible, se requiere versión 3.7 o superior. Actualizando Python..."
+    apt-get install -y python3.8
     fi
 
     # Descargar y descomprimir Bazarr
     log "Creando la carpeta de Bazarr..."
-    mkdir -p /opt/bazarr || { log "Error al crear la carpeta /opt/bazarr."; return 1; }
-    log "Descargando el repositorio de Bazarr..."
-    wget -P /opt/bazarr https://github.com/morpheus65535/bazarr/releases/latest/download/bazarr.zip || { log "Error al descargar Bazarr."; return 1; }
+    mkdir -p /opt/bazarr
+    log "Descargando el repositorio de Bazarr ..."
+    wget -P /opt/bazarr https://github.com/morpheus65535/bazarr/releases/latest/download/bazarr.zip
     log "Descomprimiendo el repositorio de Bazarr en la carpeta..."
-    unzip -d /opt/bazarr /opt/bazarr/bazarr.zip && rm /opt/bazarr/bazarr.zip || { log "Error al descomprimir Bazarr."; return 1; }
+    unzip -d /opt/bazarr /opt/bazarr/bazarr.zip
+    rm /opt/bazarr/bazarr.zip
 
-    # Instalar requisitos de Python
+    # Instalar requisitos de Python""
     log "Instalando los requisitos de Python..."
-    python3 -m pip install -r /opt/bazarr/requirements.txt || { log "Error al instalar los requisitos de Python."; return 1; }
+    python3 -m pip install -r /opt/bazarr/requirements.txt
 
     # En Raspberry Pi antiguas (ARMv6) numpy no es compatible
     if [ "$(uname -m)" = "armv6l" ]; then
-        log "Raspberry Pi antigua detectada. Reemplazando numpy..."
-        python3 -m pip uninstall -y numpy && apt-get install -y python3-numpy || { log "Error al reemplazar numpy."; return 1; }
+    log "Raspberry Pi antigua detectada. Reemplazando numpy..."
+    python3 -m pip uninstall -y numpy
+    apt-get install -y python3-numpy
     fi
 
     # Cambiar propiedad de la carpeta de Bazarr al usuario deseado
-    log "Cambiando propiedad y permisos de la carpeta de Bazarr..."
+    log " Cambiando propiedad y permisos de la carpeta de Bazarr..."
     chown -R $usuario:$app_guid /opt/bazarr
-    chmod -R 755 /opt/bazarr || { log "Error al cambiar los permisos de la carpeta."; return 1; }
+    chmod -R 777 /opt/bazarr
 
-    # Crear el archivo de servicio de systemd
-    cat << EOF | tee /etc/systemd/system/bazarr.service
+
+# Crear el archivo de servicio de systemd
+cat << EOF | tee /etc/systemd/system/bazarr.service
 [Unit]
 Description=Bazarr Daemon
 After=syslog.target network.target
@@ -615,7 +598,9 @@ EOF
 
     # Iniciar y habilitar el servicio
     log "Habilitando e iniciando el servicio de Bazarr..."
-    systemctl start bazarr && systemctl enable bazarr || { log "Error al iniciar o habilitar el servicio de Bazarr."; return 1; }
+    sudo systemctl start bazarr
+    sudo systemctl enable bazarr
+    sudo systemctl status bazarr
 
     # Mensaje de confirmación y enlace para acceder a la interfaz web de Bazarr
     log "¡Bazarr ha sido instalado correctamente!"
