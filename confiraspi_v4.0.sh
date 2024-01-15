@@ -51,7 +51,7 @@ leer_credenciales() {
 
 actualizar_raspi() {
     log "1) Actualizando la Raspberry Pi..."
-    sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y && sudo apt clean
+    sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y && sudo apt clean 
     #instalo jq para tratar ficheros json
     if ! command -v jq > /dev/null 2>&1; then
         sudo apt-get install jq -y
