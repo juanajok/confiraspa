@@ -691,7 +691,6 @@ setup_logrotate_from_json() {
     # Verificar si el archivo jobs_config.json existe
     if [ ! -f "$JOBS_CONFIG" ]; then
         log "El archivo $JOBS_CONFIG no existe."
-        exit 1
     fi
 
     # Comprobar si el archivo de configuración de logrotate ya existe
