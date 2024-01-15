@@ -1,0 +1,7 @@
+{
+    "conexion": "Wired connection 1",
+    "ip_estatica": "192.168.1.76",
+    "gateway": "192.168.1.1",
+    "dns": "8.8.8.8,8.8.4.4",
+    "mascara": "24"
+}
