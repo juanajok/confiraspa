@@ -771,7 +771,7 @@ main() {
     instalar_bazarr
     instalar_amule
     instalar_rclone
-    setup_logrotate_from_json
+    #setup_logrotate_from_json
     comandos_crontab
     log "Info: script finalizado, por favor reinicia para que los cambios tengan efecto"
 }
