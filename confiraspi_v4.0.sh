@@ -100,11 +100,7 @@ configurar_ip_estatica() {
     fi
 
     # Encuentra el nombre del dispositivo asociado con esta conexión
-    NOMBRE_DISPOSITIVO=$(nmcli -t -f DEVICE con show "$CONEXION")
-    if [ -z "$NOMBRE_DISPOSITIVO" ]; then
-        log "Error: No se pudo encontrar el dispositivo para la conexión $CONEXION."
-        return 1
-    fi
+    NOMBRE_DISPOSITIVO="eth0"
 
     # Aplica la configuración a la conexión
     if nmcli con mod "$CONEXION" ipv4.addresses "$IP_ESTATICA/$MASCARA" &&

@@ -6,7 +6,7 @@ app_guid=$(id -gn "$usuario")
 # Cambiar a usuario root
 
 # Actualizar repositorios e instalar paquetes necesarios
-apt-get install -y libxml2-dev libxslt1-dev python3-dev python3-libxml2 python3-lxml unrar-free ffmpeg libatlas-base-dev -y
+apt-get install -y libxml2-dev libxslt1-dev python3-dev python3-libxml2 python3-lxml ffmpeg libatlas-base-dev python3-pip python3-distutils unrar unzip -y
 
 # Comprobar versión de Python instalada y actualizar si es necesario
 python_version=$(python3 -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
@@ -21,19 +21,20 @@ wget -P /opt/bazarr https://github.com/morpheus65535/bazarr/releases/latest/down
 unzip -d /opt/bazarr /opt/bazarr/bazarr.zip
 rm /opt/bazarr/bazarr.zip
 
-# Instalar requisitos de Python
-python3 -m pip install -r /opt/bazarr/requirements.txt
-
-# En Raspberry Pi antiguas (ARMv6) numpy no es compatible
-if [ "$(uname -m)" = "armv6l" ]; then
-  echo "Raspberry Pi antigua detectada. Reemplazando numpy..."
-  python3 -m pip uninstall -y numpy
-  apt-get install -y python3-numpy
-fi
-
 # Cambiar propiedad de la carpeta de Bazarr al usuario deseado
 chown -R $usuario:$app_guid /opt/bazarr
 chmod -R 777 /opt/bazarr
+
+# Crea un entorno virtual
+cd /opt/bazarr
+python3 -m venv myenv
+source myenv/bin/activate
+# Instala las dependencias de Bazarr
+pip install -r requirements.txt
+
+# Desactiva el entorno virtual
+deactivate
+
 
 
 # Crear el archivo de servicio de systemd
