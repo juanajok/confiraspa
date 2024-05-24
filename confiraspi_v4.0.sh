@@ -753,7 +753,7 @@ main() {
     # Llamadas a las funciones
     actualizar_raspi
     leer_credenciales
-    configurar_ip_estatica
+    #configurar_ip_estatica
     crear_puntos_de_montaje
     generate_fstab
     instalar_samba
@@ -766,8 +766,8 @@ main() {
     instalar_plex
     instalar_bazarr
     instalar_amule
-    #instalar_rclone
-    #setup_logrotate_from_json
+    instalar_rclone
+    setup_logrotate_from_json
     comandos_crontab
     log "Info: script finalizado, por favor reinicia para que los cambios tengan efecto"
 }
