@@ -32,40 +32,81 @@ log() {
 }
 
 # Función principal que coordina la ejecución de los scripts
-main() {
+main() {    # Añadir permisos de ejecución a todos los scripts
+    log "Asignando permisos de ejecución a los scripts..."
+    chmod +x /opt/confiraspa/*.sh
     # Actualiza el sistema y asegura que las dependencias básicas están instaladas
+    log "1) Actualizando el sistema..."
     ./update_system.sh
+
     # Lee las credenciales y asegura que se está ejecutando como superusuario
+    log "2) Configurando las credenciales..."
     ./setup_credentials.sh
+
     # Configura una IP estática usando nmcli
-    ./configure_static_ip.sh
+    #./configure_static_ip.sh
+
     # Crea los puntos de montaje especificados en un archivo JSON
+    log "4) Creando puntos de montaje..."
     ./create_mount_points.sh
+
+    
     # Genera entradas para el archivo fstab
+    log "5) Generando fstab..."
     ./generate_fstab.sh
+
     # Instala y configura Samba
+    log "6) Instalando Samba..."
     ./install_samba.sh
+
     # Instala y configura XRDP
+    log "7) Instalando XRDP..."
     ./install_xrdp.sh
+
     # Instala y configura Transmission
+    log "8) Instalando Transmission..."
     ./install_transmission.sh
+
     # Instala Mono
+    log "9) Instalando Mono..."
     ./install_mono.sh
+
     # Instala Sonarr
+    log "10) Instalando Sonarr..."
     ./install_sonarr.sh
+
     # Instala Webmin
+    log "11) Instalando Webmin..."
     ./install_webmin.sh
+
     # Habilita VNC
+    log "12) Habilitando VNC..."
     ./enable_vnc.sh
+
     # Instala Plex Media Server
+    log "13) Instalando Plex..."
     ./install_plex.sh
+
     # Instala y configura Bazarr
+    log "14) Instalando Bazarr..."
     ./install_bazarr.sh
+
     # Instala y configura aMule
+    log "15) Instalando aMule..."
     ./install_amule.sh
+
     # Configura las tareas programadas en crontab
+    log "16) Configurando crontab..."
     ./configure_crontab.sh
 
+    # Instala y configura RClone
+    log "16) Instalando RClone..."
+    install_rclone.sh
+
+    # Configura el rotado de logs
+    log "16) Instalando RClone..."
+    setup_logrotate_from_json.sh
+    
     log "Info: script finalizado, por favor reinicia para que los cambios tengan efecto"
 }
 
