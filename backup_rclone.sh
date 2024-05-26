@@ -14,11 +14,12 @@
 SCRIPT_DIR="$(dirname "$0")"
 CONFIG_FILE="$SCRIPT_DIR/backup_rclone_config.json"
 LOG_FILE="$SCRIPT_DIR/logs/backup_rclone_$(date +'%Y-%m-%d_%H-%M-%S').log"
+RCLONE_CONFIG="/home/pi/.config/rclone/rclone.conf"  # Ruta al archivo de configuración de rclone
 
 # Funciones
 log_message() {
     local message="$1"
-    echo "$(date +'%Y-%m-%d %H:%M:%S') - $0 - $message" >> "$LOG_FILE"
+    echo "$(date +'%Y-%m-%d %H:%M:%S') - $0 - $message" | tee -a "$LOG_FILE"
 }
 
 # Comenzar
@@ -35,7 +36,7 @@ jq -c '.directorios[]' "$CONFIG_FILE" | while read -r dir_info; do
     origen=$(echo "$dir_info" | jq -r '.origen')
     destino=$(echo "$dir_info" | jq -r '.destino')
     log_message "Sincronizando origen: $origen con destino: $destino..."
-    rclone sync "$origen" "$destino" >> "$LOG_FILE" 2>&1
+    rclone sync "$origen" "$destino" --config="$RCLONE_CONFIG" >> "$LOG_FILE" 2>&1
     if [ $? -eq 0 ]; then
         log_message "Sincronización completada para origen: $origen con destino: $destino."
     else
