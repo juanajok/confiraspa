@@ -1,4 +1,26 @@
-[
-    {"job": "backup_rclone", "days": 30},
-    {"job": "backup_rsync", "days": 7}
-]
+{
+    "jobs": [
+        {
+            "name": "backup_rclone",
+            "path": "/opt/confiraspa/logs/backup_rclone_*.log",
+            "rotate": 7,
+            "daily": true,
+            "compress": true,
+            "missingok": true,
+            "notifempty": true,
+            "create": "0640 root utmp",
+            "postrotate": "/usr/bin/systemctl reload rclone"
+        },
+        {
+            "name": "backup_rsync",
+            "path": "/opt/confiraspa/logs/backup_rsync_*.log",
+            "rotate": 7,
+            "daily": true,
+            "compress": true,
+            "missingok": true,
+            "notifempty": true,
+            "create": "0640 root utmp",
+            "postrotate": "/usr/bin/systemctl reload rsync"
+        }
+    ]
+}
