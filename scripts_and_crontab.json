@@ -18,5 +18,9 @@
   {
     "script": "SCRIPT_PATH_PLACEHOLDER/backup_rclone.sh",
     "crontab_entry":  "0 4 * * *"
+  },
+  {
+    "script": "SCRIPT_PATH_PLACEHOLDER/backup_rclone.sh",
+    "crontab_entry":  "0 4 * * *"
   }
 ]

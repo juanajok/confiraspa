@@ -11,9 +11,14 @@ Instrucciones:
        llamado "app_backup_paths.json" con el siguiente formato:
        {
            "app_paths": [
-               "/ruta/al/backup/app1",
-               "/ruta/al/backup/app2",
-               ...
+               {
+                   "path": "/ruta/al/backup/app1",
+                   "num_copies_to_keep": 3
+               },
+               {
+                   "path": "/ruta/al/backup/app2",
+                   "num_copies_to_keep": 3
+               }
            ]
        }
     2. Ejecuta el script con el comando 'python3 backup_cleanup.py' o dale permisos
@@ -25,6 +30,9 @@ import glob
 import json
 from pathlib import Path
 from datetime import datetime
+
+# Cambia el directorio de trabajo al directorio del script
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Lee las rutas de las carpetas de backup de las aplicaciones desde el archivo JSON
 def read_app_paths(json_file):

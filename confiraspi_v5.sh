@@ -101,11 +101,11 @@ main() {    # Añadir permisos de ejecución a todos los scripts
 
     # Instala y configura RClone
     log "16) Instalando RClone..."
-    install_rclone.sh
+    ./install_rclone.sh
 
     # Configura el rotado de logs
     log "16) Instalando RClone..."
-    setup_logrotate_from_json.sh
+    ./setup_logrotate_from_json.sh
     
     log "Info: script finalizado, por favor reinicia para que los cambios tengan efecto"
 }
