@@ -1,32 +1,49 @@
 #!/bin/bash
+set -e
 
-# Función de registro para imprimir mensajes con marca de tiempo
+# Descripción: Este script crea puntos de montaje según una configuración en JSON.
+# Autor: [Tu Nombre]
+# Fecha: [Fecha]
+# Versión: 1.0.0
+
+# Función de registro para imprimir mensajes con marca de tiempo y nivel de log
 log() {
-    local message="$1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [${FUNCNAME[1]}] $message"
+    local level="$1"
+    local message="$2"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message"
 }
 
-# Imprime un mensaje indicando que se está iniciando la creación de puntos de montaje
-log "Iniciando la creación de puntos de montaje..."
-
-# Verifica si el archivo puntos_de_montaje.json existe
-if [ ! -f puntos_de_montaje.json ]; then
-    log "Error: No se encuentra el archivo puntos_de_montaje.json."
+# Verificar si se ejecuta como root
+if [[ $EUID -ne 0 ]]; then
+    log "ERROR" "Este script debe ser ejecutado con privilegios de superusuario (sudo)."
     exit 1
 fi
 
-# Lee los puntos de montaje del archivo JSON
-directorios=$(cat puntos_de_montaje.json | jq -r '.puntos_de_montaje | .[]')
+# Ruta del script y del archivo JSON
+script_dir="$(dirname "$(realpath "$0")")"
+json_file="$script_dir/configs/puntos_de_montaje.json"
 
-# Crea cada punto de montaje y aplica permisos
-for dir in ${directorios}; do
+# Verificar si el archivo JSON existe
+if [ ! -f "$json_file" ]; then
+    log "ERROR" "No se encuentra el archivo de configuración $json_file."
+    exit 1
+fi
+
+log "INFO" "Iniciando la creación de puntos de montaje..."
+
+# Leer los puntos de montaje del archivo JSON
+mount_points=$(jq -r '.puntos_de_montaje[]' "$json_file")
+
+# Crear cada punto de montaje y aplicar permisos
+for dir in $mount_points; do
     if [ ! -d "$dir" ]; then
         mkdir -p "$dir"
-        chmod -R 777 "$dir"
-        log "Punto de montaje creado y permisos aplicados: $dir"
+        chmod 777 "$dir"
+        log "INFO" "Punto de montaje creado: $dir"
     else
-        log "El punto de montaje $dir ya existe."
+        log "INFO" "El punto de montaje $dir ya existe."
     fi
 done
 
-log "Finalizando la creación de puntos de montaje..."
+log "INFO" "Finalizando la creación de puntos de montaje."
+

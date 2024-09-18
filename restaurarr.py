@@ -1,3 +1,20 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Script Name: restore_apps.py
+Description: Restaura aplicaciones desde backups usando archivos JSON de configuración.
+Author: Juan José Hipólito
+Version: 2.1.0
+Date: 2023-08-07
+License: GNU
+Usage: Ejecuta el script manualmente o programa su ejecución en crontab.
+Dependencies: Python 3, json, os, shutil, tarfile, zipfile, subprocess, time, logging.
+Notes:
+- Asegúrate de que las rutas de origen y destino estén montadas antes de ejecutar este script.
+- Es recomendable reiniciar el sistema después de la restauración para que las aplicaciones reconozcan los cambios.
+"""
+
 import json
 import os
 import shutil
@@ -6,187 +23,261 @@ import zipfile
 import subprocess
 import time
 import logging
+from logging.handlers import RotatingFileHandler
 
-# Script Name: restaurarr.py
-# Description: Script para restaurar aplicaciones desde backups usando archivos JSON de configuración.
-# Author: Juan José Hipólito
-# Version: 1.1.0
-# Date: 2023-08-07
-# License: GNU
-# Usage: Ejecuta el script manualmente o programa su ejecución en crontab.
-# Dependencies: Python 3, json, os, shutil, tarfile, zipfile, subprocess, time, logging.
-# Notes: Asegúrate de que las rutas de origen y destino estén montadas antes de ejecutar este script.
-#        Es recomendable reiniciar la raspberry después de la restauración para que las aplicaciones reconozcan los cambios.
+# Configuración global
+CONFIG_DIR = "/configs"
+CONFIG_FILE = os.path.join(CONFIG_DIR, "restore_apps.json")
+LOG_FILE = "restore_apps.log"
+MAX_LOG_SIZE = 5 * 1024 * 1024  # 5 MB
+BACKUP_ORIG_DIR_NAME = "backup_orig"
 
+def setup_logging():
+    """Configura el sistema de logging."""
+    logger = logging.getLogger("RestoreApps")
+    logger.setLevel(logging.INFO)
 
+    # Crear handler para archivo de log con rotación
+    handler = RotatingFileHandler(LOG_FILE, maxBytes=MAX_LOG_SIZE, backupCount=3)
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
-# Carga el contenido de un archivo de configuración en formato JSON y lo devuelve como un diccionario de Python.
+    # Añadir handler para la consola
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    return logger
+
 def load_config(config_file):
+    """Carga el contenido de un archivo JSON y lo devuelve como diccionario."""
     try:
-        with open(config_file) as f:
+        with open(config_file, 'r') as f:
             config = json.load(f)
             return config
     except FileNotFoundError:
-        print(f"No se pudo abrir el archivo de configuración {config_file}.")
-        return None
+        logger.error(f"No se pudo encontrar el archivo de configuración '{config_file}'.")
+        raise
+    except json.JSONDecodeError as e:
+        logger.error(f"Error al parsear el archivo JSON: {e}")
+        raise
 
-
-# Devuelve la ruta completa del archivo de backup más reciente de la aplicación.
 def get_latest_backup(backup_dir, backup_ext):
+    """Devuelve la ruta completa del archivo de backup más reciente."""
     if not os.path.exists(backup_dir):
-        print(f"El directorio de backup {backup_dir} no existe.")
+        logger.error(f"El directorio de backup '{backup_dir}' no existe.")
         return None
 
-    backup_files = os.listdir(backup_dir)
-    backup_files = [f for f in backup_files if f.endswith(backup_ext)]
-    backup_files = sorted(backup_files, key=lambda f: os.path.getmtime(os.path.join(backup_dir, f)), reverse=True)
-    if len(backup_files) == 0:
-        return None
+    if backup_ext:
+        backup_files = [
+            f for f in os.listdir(backup_dir)
+            if f.endswith(backup_ext) and os.path.isfile(os.path.join(backup_dir, f))
+        ]
     else:
-        return os.path.join(backup_dir, backup_files[0])
+        backup_files = [
+            f for f in os.listdir(backup_dir)
+            if os.path.isfile(os.path.join(backup_dir, f))
+        ]
+
+    if not backup_files:
+        logger.error(f"No se encontraron archivos de backup en '{backup_dir}'.")
+        return None
+
+    backup_files.sort(
+        key=lambda f: os.path.getmtime(os.path.join(backup_dir, f)),
+        reverse=True
+    )
+    latest_backup = os.path.join(backup_dir, backup_files[0])
+    logger.info(f"Último backup encontrado: '{latest_backup}'.")
+    return latest_backup
 
 def stop_app(app):
-    print(f"Deshabilitando la aplicación {app}...")
+    """Detiene el servicio de la aplicación."""
+    logger.info(f"Deteniendo la aplicación '{app}'...")
     try:
-        subprocess.run(["sudo", "systemctl", "stop", app], check=True)
-        print(f"La aplicación {app} ha sido detenida exitosamente.")
-        
-        # Esperar a que la aplicación se detenga
-        while True:
-            process = subprocess.Popen(["systemctl", "is-active", app], stdout=subprocess.PIPE)
-            output = process.communicate()[0].decode("utf-8").strip()
-            if output == "inactive":
-                print(f"La aplicación {app} se ha detenido exitosamente.")
-                break
-            else:
-                print(f"Esperando a que la aplicación {app} se detenga...")
-                time.sleep(5)
-    except subprocess.CalledProcessError:
-        print(f"Error al detener la aplicación {app}.")
-
+        subprocess.run(
+            ["systemctl", "stop", app],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        logger.info(f"La aplicación '{app}' ha sido detenida exitosamente.")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error al detener la aplicación '{app}': {e.stderr.decode().strip()}")
+        raise
 
 def start_app(app):
-    print(f"Habilitando la aplicación {app}...")
+    """Inicia el servicio de la aplicación."""
+    logger.info(f"Iniciando la aplicación '{app}'...")
     try:
-        subprocess.run(["sudo", "systemctl", "start", app], check=True)
-        print(f"La aplicación {app} ha sido arrancada exitosamente.")
-    except subprocess.CalledProcessError:
-        print(f"Error al arrancar la aplicación {app}.")
+        subprocess.run(
+            ["systemctl", "start", app],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        logger.info(f"La aplicación '{app}' ha sido iniciada exitosamente.")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error al iniciar la aplicación '{app}': {e.stderr.decode().strip()}")
+        raise
 
-
-def restore_app(app, app_config):
-    # Obtener la información de la configuración de la aplicación
-    backup_dir = app_config["backup_dir"]
-    backup_ext = app_config["backup_ext"]
-    restore_dir = app_config["restore_dir"]
-    files = app_config.get("files_to_restore", [])
-    permissions = app_config.get("file_permissions", {})
-
-    logger = logging.getLogger(app)
-
-    # Detener la aplicación antes de la restauración
-    stop_app(app)
-
-    # Verificar si la carpeta de restauración existe antes de continuar
-    if not os.path.exists(restore_dir):
-        logger.info(f"No existe la carpeta de restauración '{restore_dir}', creando...")
-        os.makedirs(restore_dir)
-        logger.info(f"Carpeta de restauración '{restore_dir}' creada exitosamente.")
-
-    # Crear la carpeta backup_orig y hacer una copia de los archivos originales
-    backup_orig_dir = os.path.join(restore_dir, "backup_orig")
+def backup_original_files(files, restore_dir, backup_orig_dir):
+    """Realiza una copia de seguridad de los archivos originales."""
     if not os.path.exists(backup_orig_dir):
-        logger.info(f"No existe la carpeta '{backup_orig_dir}', creando...")
         os.makedirs(backup_orig_dir)
-        logger.info(f"Carpeta '{backup_orig_dir}' creada exitosamente.")
-    logger.info("Haciendo una copia de los archivos originales en la carpeta 'backup_orig'...")
+        logger.info(f"Directorio '{backup_orig_dir}' creado para el backup de archivos originales.")
+
     for file in files:
         src_path = os.path.join(restore_dir, file)
         dst_path = os.path.join(backup_orig_dir, file)
         if os.path.exists(src_path):
-            shutil.copy(src_path, dst_path)
-            logger.info(f"Archivo '{file}' copiado exitosamente a la carpeta 'backup_orig'.")
+            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+            shutil.copy2(src_path, dst_path)
+            logger.info(f"Archivo '{src_path}' copiado a '{dst_path}'.")
         else:
-            logger.info(f"No se encontró el archivo '{file}' en la carpeta de restauración.")
+            logger.warning(f"Archivo original '{src_path}' no encontrado; no se pudo hacer backup.")
 
-    # Encontrar el último backup disponible en el directorio de backup
-    backup_file = get_latest_backup(backup_dir, backup_ext)
-    if backup_file is None:
-        logger.info(f"No se encontraron backups para la aplicación '{app}'.")
-        return
-    logger.info(f"Último backup encontrado para la aplicación '{app}': '{backup_file}'.")
-    logger.info(f"La extensión del archivo de backup es '{backup_ext}'.")
-
-
-    # Restaurar los archivos desde el backup en la carpeta de restauración
-    logger.info(f"Restaurando los archivos de la aplicación '{app}'...")
-    if backup_ext.endswith("zip"):
-        with zipfile.ZipFile(backup_file, "r") as f:
-            logger.info(f"La extensión del archivo de backup es '{backup_ext}'.")
-            logger.info(f"Archivos en el archivo zip: {f.namelist()}")
+def extract_backup(backup_file, backup_ext, files, restore_dir):
+    """Extrae los archivos especificados desde el backup al directorio de restauración."""
+    logger.info(f"Extrayendo archivos desde el backup '{backup_file}'...")
+    if backup_ext == ".zip":
+        with zipfile.ZipFile(backup_file, "r") as zf:
             for file in files:
                 try:
-                    f.extract(file, restore_dir)
-                    logger.info(f"Archivo '{file}' restaurado exitosamente.")
+                    zf.extract(file, restore_dir)
+                    logger.info(f"Archivo '{file}' extraído exitosamente.")
                 except KeyError:
-                    logger.info(f"No se encontró el archivo '{file}' en el backup '{backup_file}'.")
-
-    elif backup_ext.endswith(("tar", "tar.gz", "tgz")):
-        with tarfile.open(backup_file, "r") as f:
+                    logger.error(f"Archivo '{file}' no encontrado en el backup.")
+                    raise
+    elif backup_ext in [".tar", ".tar.gz", ".tgz"]:
+        with tarfile.open(backup_file, "r:*") as tf:
             for file in files:
                 try:
-                    f.extract(file, restore_dir)
-                    logger.info(f"Archivo '{file}' restaurado exitosamente.")
+                    tf.extract(file, restore_dir)
+                    logger.info(f"Archivo '{file}' extraído exitosamente.")
                 except KeyError:
-                    logger.info(f"No se encontró el archivo '{file}' en el backup '{backup_file}'.")
+                    logger.error(f"Archivo '{file}' no encontrado en el backup.")
+                    raise
     else:
+        # Asumimos que el backup es un directorio o un archivo sin comprimir
         for file in files:
-            src_path = os.path.join(backup_dir, file)
+            src_path = os.path.join(backup_file, file)
             dst_path = os.path.join(restore_dir, file)
             if os.path.exists(src_path):
-                shutil.copy(src_path, dst_path)
-                logger.info(f"Archivo '{file}' restaurado exitosamente.")
+                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                shutil.copy2(src_path, dst_path)
+                logger.info(f"Archivo '{src_path}' copiado a '{dst_path}'.")
             else:
-                logger.info(f"No se encontró el archivo '{file}' en el directorio de backup.")
+                logger.warning(f"Archivo '{src_path}' no encontrado en el backup.")
 
-    # Cambiar los permisos de los archivos restaurados
+def change_permissions(permissions, restore_dir):
+    """Cambia los permisos de los archivos restaurados."""
     for file, perm in permissions.items():
         file_path = os.path.join(restore_dir, file)
-        logger.info (file_path) 
-        logger.info (perm)
-
-        if os.path.isfile(file_path):
-            os.chmod(file_path, int(perm,8))
-            logger.info(f"se han cambiado los permisos a {perm} para el archivo {file_path}")
-
+        if os.path.exists(file_path):
+            try:
+                os.chmod(file_path, int(perm, 8))
+                logger.info(f"Permisos de '{file_path}' cambiados a '{perm}'.")
+            except Exception as e:
+                logger.error(f"No se pudieron cambiar los permisos de '{file_path}': {e}")
+                raise
         else:
-            logger.info(f"No se pudo cambiar los permisos a {perm} para el archivo {file_path}")
+            logger.warning(f"Archivo '{file_path}' no encontrado para cambiar permisos.")
 
+def restore_app(app, app_config):
+    """Restaura una aplicación según su configuración."""
+    logger.info(f"--- Iniciando restauración de '{app}' ---")
 
-    logger.info(f"Aplicación {app} restaurada desde {backup_file}.")
+    backup_dir = app_config.get("backup_dir")
+    backup_ext = app_config.get("backup_ext")
+    restore_dir = app_config.get("restore_dir")
+    files = app_config.get("files_to_restore", [])
+    permissions = app_config.get("file_permissions", {})
 
+    # Validaciones
+    if not all([backup_dir, restore_dir, files]):
+        logger.error(f"Configuración incompleta para la aplicación '{app}'.")
+        return
 
+    # Asegurar que backup_ext comienza con '.'
+    if backup_ext and not backup_ext.startswith('.'):
+        backup_ext = f".{backup_ext}"
+
+    # Detener la aplicación si no es 'rclone' (no es un servicio)
+    if app.lower() != "rclone":
+        try:
+            stop_app(app)
+        except Exception:
+            logger.error(f"No se pudo detener la aplicación '{app}'. Continuando con la restauración.")
+    else:
+        logger.info(f"La aplicación '{app}' no es un servicio; no se requiere detener.")
+
+    # Crear directorio de restauración si no existe
+    os.makedirs(restore_dir, exist_ok=True)
+
+    # Realizar backup de archivos originales
+    backup_orig_dir = os.path.join(restore_dir, BACKUP_ORIG_DIR_NAME)
+    backup_original_files(files, restore_dir, backup_orig_dir)
+
+    # Obtener el último backup disponible
+    backup_file = get_latest_backup(backup_dir, backup_ext)
+    if not backup_file:
+        logger.error(f"No se pudo encontrar un backup válido para '{app}'.")
+        return
+
+    # Restaurar archivos desde el backup
+    try:
+        extract_backup(backup_file, backup_ext, files, restore_dir)
+    except Exception:
+        logger.error(f"Error durante la extracción de archivos para '{app}'.")
+        return
+
+    # Cambiar permisos de archivos restaurados
+    try:
+        change_permissions(permissions, restore_dir)
+    except Exception:
+        logger.error(f"Error al cambiar permisos para '{app}'.")
+        return
+
+    # Iniciar la aplicación si no es 'rclone'
+    if app.lower() != "rclone":
+        try:
+            start_app(app)
+        except Exception:
+            logger.error(f"No se pudo iniciar la aplicación '{app}' después de la restauración.")
+            return
+    else:
+        logger.info(f"La aplicación '{app}' no es un servicio; no se requiere iniciar.")
+
+    logger.info(f"Restauración de '{app}' completada exitosamente.")
+    logger.info(f"--- Fin de restauración de '{app}' ---\n")
 
 def main():
-    #definimos los logs
-    logging.basicConfig(
-        filename="restore_apps.log",
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        level=logging.INFO
-    )
-    # Cargar la configuración desde el archivo JSON
-    config = load_config("restore_apps.json")
+    """Función principal."""
+    global logger
+    logger = setup_logging()
 
-    # Iterar sobre las aplicaciones y restaurar cada una
+    logger.info("Iniciando proceso de restauración de aplicaciones.")
+
+    # Cargar configuración
+    try:
+        config = load_config(CONFIG_FILE)
+    except Exception as e:
+        logger.error(f"No se pudo cargar la configuración: {e}")
+        return
+
+    # Restaurar cada aplicación
     for app, app_config in config.items():
-        restore_app(app, app_config)
+        try:
+            restore_app(app, app_config)
+        except Exception as e:
+            logger.error(f"Error inesperado al restaurar '{app}': {e}")
 
-    # iniciar la aplicación después de la restauración
-    start_app(app)
-
-    print("Proceso de restauración finalizado con éxito.")
-    print("Es recomendable reiniciar la raspberry para que sonarr coja los cambios")
-
+    logger.info("Proceso de restauración completado.")
+    logger.info("Es recomendable reiniciar el sistema para que los cambios surtan efecto.")
 
 if __name__ == '__main__':
     main()

@@ -1,208 +1,200 @@
 #!/bin/bash
-### Description: \*Arr .NET Debian install
-### Originally written for Radarr by: DoctorArr - doctorarr@the-rowlands.co.uk on 2021-10-01 v1.0
-### Version v1.1 2021-10-02 - Bakerboy448 (Made more generic and conformant)
-### Version v1.1.1 2021-10-02 - DoctorArr (Spellcheck and boilerplate update)
-### Version v2.0.0 2021-10-09 - Bakerboy448 (Refactored and ensured script is generic. Added more variables.)
-### Version v2.0.1 2021-11-23 - brightghost (Fixed datadir step to use correct variables.)
-### Version v3.0.0 2022-02-03 - Bakerboy448 (Rewrote script to prompt for user/group and made generic for all \*Arrs)
-### Version v3.0.1 2022-02-05 - aeramor (typo fix line 179: 'chown "$app_uid":"$app_uid" -R "$bindir"' -> 'chown "$app_uid":"$app_guid" -R "$bindir"')
-### Version v3.0.3 2022-02-06 - Bakerboy448 fixup ownership
-### Version v3.0.3a Readarr to develop
-### Version v3.0.4 2022-03-01 - Add sleep before checking service status
-### Version v3.0.5 2022-04-03 - VP-EN (Added Whisparr)
-### Version v3.0.6 2022-04-26 - Bakerboy448 - binaries to group
-### Additional Updates by: The \*Arr Community
+### Description: Instalación automatizada de todas las aplicaciones \*Arr
+### Modificado para instalar todas las aplicaciones sin solicitar selección al usuario
+### Lee el usuario y grupo desde /configs/arr_user.json
 
-### Boilerplate Warning
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-#EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-#MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-#NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-#LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-#OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-#WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-scriptversion="3.0.6"
-scriptdate="2022-04-26"
+scriptversion="4.0.0"
+scriptdate="2023-10-05"
 
 set -euo pipefail
 
-echo "Running \*Arr Install Script - Version [$scriptversion] as of [$scriptdate]"
+# Función de registro para imprimir mensajes con marca de tiempo y nivel de log
+log() {
+    local level="$1"
+    local message="$2"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message"
+}
 
-# Am I root?, need root!
+log "INFO" "Ejecutando el script de instalación de todas las aplicaciones \*Arr - Versión [$scriptversion] - Fecha [$scriptdate]"
 
+# Verificar si se ejecuta como root
 if [ "$EUID" -ne 0 ]; then
-    echo "Please run as root."
-    exit
+    log "ERROR" "Este script debe ser ejecutado con privilegios de superusuario (sudo)."
+    exit 1
 fi
 
-echo "Select the application to install: "
+# Definir las aplicaciones a instalar
+apps=("lidarr" "prowlarr" "radarr" "readarr" "whisparr")
 
-select app in lidarr prowlarr radarr readarr whisparr quit; do
+# Leer usuario y grupo desde el archivo JSON en /configs
+config_dir="/configs"
+json_file="$config_dir/arr_user.json"
 
+# Verificar si el archivo JSON existe
+if [ ! -f "$json_file" ]; then
+    log "ERROR" "El archivo de configuración $json_file no se encuentra."
+    exit 1
+fi
+
+# Verificar si 'jq' está instalado
+if ! command -v jq >/dev/null 2>&1; then
+    log "INFO" "Instalando 'jq'..."
+    apt-get update
+    apt-get install -y jq
+fi
+
+# Leer usuario y grupo desde el archivo JSON
+app_uid=$(jq -r '.user' "$json_file")
+app_guid=$(jq -r '.group' "$json_file")
+
+# Validar que los valores no estén vacíos
+if [ -z "$app_uid" ] || [ -z "$app_guid" ]; then
+    log "ERROR" "El archivo $json_file no contiene el usuario o grupo."
+    exit 1
+fi
+
+log "INFO" "Las aplicaciones se instalarán y ejecutarán como el usuario [$app_uid] y el grupo [$app_guid]."
+
+# Crear usuario y grupo si es necesario
+if ! getent group "$app_guid" >/dev/null; then
+    log "INFO" "Creando grupo [$app_guid]..."
+    groupadd "$app_guid"
+fi
+
+if ! id -u "$app_uid" >/dev/null 2>&1; then
+    log "INFO" "Creando usuario [$app_uid] y agregándolo al grupo [$app_guid]..."
+    adduser --system --no-create-home --ingroup "$app_guid" "$app_uid"
+fi
+
+if ! id -nG "$app_uid" | grep -qw "$app_guid"; then
+    log "INFO" "Agregando usuario [$app_uid] al grupo [$app_guid]..."
+    usermod -a -G "$app_guid" "$app_uid"
+fi
+
+# Directorio de instalación
+installdir="/opt"
+
+# Instalar paquetes comunes necesarios para todas las aplicaciones
+log "INFO" "Actualizando lista de paquetes e instalando paquetes comunes necesarios..."
+apt-get update
+apt-get install -y curl sqlite3
+
+# Función para instalar una aplicación
+install_app() {
+    local app="$1"
     case $app in
     lidarr)
-        app_port="8686"                                          # Default App Port; Modify config.xml after install if needed
-        app_prereq="curl sqlite3 libchromaprint-tools mediainfo" # Required packages
-        app_umask="0002"                                         # UMask the Service will run as
-        branch="master"                                          # {Update me if needed} branch to install
-        break
+        app_port="8686"
+        app_prereq="libchromaprint-tools mediainfo"
+        app_umask="0002"
+        branch="master"
         ;;
     prowlarr)
-        app_port="9696"           # Default App Port; Modify config.xml after install if needed
-        app_prereq="curl sqlite3" # Required packages
-        app_umask="0002"          # UMask the Service will run as
-        branch="develop"          # {Update me if needed} branch to install
-        break
+        app_port="9696"
+        app_prereq=""
+        app_umask="0002"
+        branch="develop"
         ;;
     radarr)
-        app_port="7878"           # Default App Port; Modify config.xml after install if needed
-        app_prereq="curl sqlite3" # Required packages
-        app_umask="0002"          # UMask the Service will run as
-        branch="master"           # {Update me if needed} branch to install
-        break
+        app_port="7878"
+        app_prereq=""
+        app_umask="0002"
+        branch="master"
         ;;
     readarr)
-        app_port="8787"           # Default App Port; Modify config.xml after install if needed
-        app_prereq="curl sqlite3" # Required packages
-        app_umask="0002"          # UMask the Service will run as
-        branch="develop"          # {Update me if needed} branch to install
-        break
+        app_port="8787"
+        app_prereq=""
+        app_umask="0002"
+        branch="develop"
         ;;
     whisparr)
-        app_port="6969"           # Default App Port; Modify config.xml after install if needed
-        app_prereq="curl sqlite3" # Required packages
-        app_umask="0002"          # UMask the Service will run as
-        branch="nightly"          # {Update me if needed} branch to install
-        break
-        ;;
-    quit)
-        exit 0
+        app_port="6969"
+        app_prereq=""
+        app_umask="0002"
+        branch="nightly"
         ;;
     *)
-        echo "Invalid option $REPLY"
+        log "ERROR" "Aplicación desconocida: $app"
+        return 1
         ;;
     esac
-done
 
-# Constants
-### Update these variables as required for your specific instance
-installdir="/opt"              # {Update me if needed} Install Location
-bindir="${installdir}/${app^}" # Full Path to Install Location
-datadir="/var/lib/$app/"       # {Update me if needed} AppData directory to use
-app_bin=${app^}                # Binary Name of the app
+    bindir="${installdir}/${app^}"
+    datadir="/var/lib/$app/"
+    app_bin=${app^}
 
-if [[ $app != 'prowlarr' ]]; then
-    echo "It is critical that the user and group you select to run ${app^} as will have READ and WRITE access to your Media Library and Download Client Completed Folders"
-fi
+    log "INFO" "Instalando ${app^}..."
 
-# Prompt User
-read -r -p "What user should ${app^} run as? (Default: $app): " app_uid
-app_uid=$(echo "$app_uid" | tr -d ' ')
-app_uid=${app_uid:-$app}
-# Prompt Group
-read -r -p "What group should ${app^} run as? (Default: media): " app_guid
-app_guid=$(echo "$app_guid" | tr -d ' ')
-app_guid=${app_guid:-media}
-
-echo "${app^} selected"
-echo "This will install [${app^}] to [$bindir] and use [$datadir] for the AppData Directory"
-if [[ $app == 'prowlarr' ]]; then
-    echo "${app^} will run as the user [$app_uid] and group [$app_guid]."
-else
-    echo "${app^} will run as the user [$app_uid] and group [$app_guid]. By continuing, you've confirmed that that user and group will have READ and WRITE access to your Media Library and Download Client Completed Download directories"
-fi
-echo "Continue with the installation [Yes/No]?"
-select yn in "Yes" "No"; do
-    case $yn in
-    Yes) break ;;
-    No) exit 0 ;;
-    esac
-done
-
-# Create User / Group as needed
-if [ "$app_guid" != "$app_uid" ]; then
-    if ! getent group "$app_guid" >/dev/null; then
-        groupadd "$app_guid"
+    # Instalar paquetes específicos de la aplicación
+    if [ -n "$app_prereq" ]; then
+        log "INFO" "Instalando paquetes necesarios para ${app^}..."
+        apt-get install -y $app_prereq
     fi
-fi
-if ! getent passwd "$app_uid" >/dev/null; then
-    adduser --system --no-create-home --ingroup "$app_guid" "$app_uid"
-    echo "Created and added User [$app_uid] to Group [$app_guid]"
-fi
-if ! getent group "$app_guid" | grep -qw "$app_uid"; then
-    echo "User [$app_uid] did not exist in Group [$app_guid]"
-    usermod -a -G "$app_guid" "$app_uid"
-    echo "Added User [$app_uid] to Group [$app_guid]"
-fi
 
-# Stop the App if running
-if service --status-all | grep -Fq "$app"; then
-    systemctl stop $app
-    systemctl disable $app.service
-    echo "Stopped existing $app"
-fi
+    # Obtener la arquitectura del sistema
+    ARCH=$(dpkg --print-architecture)
 
-# Create Appdata Directory
+    # Construir la URL de descarga
+    dlbase="https://$app.servarr.com/v1/update/$branch/updatefile?os=linux&runtime=netcore"
+    case "$ARCH" in
+    "amd64") DLURL="${dlbase}&arch=x64" ;;
+    "armhf") DLURL="${dlbase}&arch=arm" ;;
+    "arm64") DLURL="${dlbase}&arch=arm64" ;;
+    *)
+        log "ERROR" "Arquitectura no soportada: $ARCH"
+        return 1
+        ;;
+    esac
 
-# AppData
-mkdir -p "$datadir"
-chown -R "$app_uid":"$app_guid" "$datadir"
-chmod 775 "$datadir"
-echo "Directories created"
-# Download and install the App
+    # Descarga e instalación de la aplicación
+    log "INFO" "Descargando ${app^} desde $DLURL..."
+    temp_dir=$(mktemp -d)
+    wget --content-disposition "$DLURL" -P "$temp_dir"
 
-# prerequisite packages
-echo ""
-echo "Installing pre-requisite Packages"
-# shellcheck disable=SC2086
-apt update && apt install $app_prereq
-echo ""
-ARCH=$(dpkg --print-architecture)
-# get arch
-dlbase="https://$app.servarr.com/v1/update/$branch/updatefile?os=linux&runtime=netcore"
-case "$ARCH" in
-"amd64") DLURL="${dlbase}&arch=x64" ;;
-"armhf") DLURL="${dlbase}&arch=arm" ;;
-"arm64") DLURL="${dlbase}&arch=arm64" ;;
-*)
-    echo "Arch not supported"
-    exit 1
-    ;;
-esac
-echo ""
-echo "Downloading..."
-wget --content-disposition "$DLURL"
-tar -xvzf ${app^}.*.tar.gz
-echo ""
-echo "Installation files downloaded and extracted"
+    log "INFO" "Extrayendo archivos..."
+    tar -xzf "$temp_dir"/${app^}.*.tar.gz -C "$temp_dir"
 
-# remove existing installs
-echo "Removing existing installation"
-# If you happen to run this script in the installdir the line below will delete the extracted files and cause the mv some lines below to fail.
-rm -rf $bindir
-echo "Installing..."
-mv "${app^}" $installdir
-chown "$app_uid":"$app_guid" -R "$bindir"
-chmod 775 "$bindir"
-rm -rf "${app^}.*.tar.gz"
-# Ensure we check for an update in case user installs older version or different branch
-touch "$datadir"/update_required
-chown "$app_uid":"$app_guid" "$datadir"/update_required
-echo "App Installed"
-# Configure Autostart
+    # Detener la aplicación si está en ejecución
+    if systemctl list-units --type=service --state=active | grep -Fq "$app.service"; then
+        log "INFO" "Deteniendo el servicio $app..."
+        systemctl stop "$app"
+        systemctl disable "$app.service"
+    fi
 
-# Remove any previous app .service
-echo "Removing old service file"
-rm -rf /etc/systemd/system/$app.service
+    # Verificar si ya existe una instalación
+    if [ -d "$bindir" ]; then
+        log "INFO" "Realizando copia de seguridad de la instalación existente..."
+        mv "$bindir" "${bindir}_backup_$(date +%Y%m%d%H%M%S)"
+    fi
 
-# Create app .service with correct user startup
-echo "Creating service file"
-cat <<EOF | tee /etc/systemd/system/$app.service >/dev/null
+    # Instalar la aplicación
+    log "INFO" "Instalando ${app^} en [$bindir]..."
+    mv "$temp_dir/${app^}" "$bindir"
+    chown -R "$app_uid":"$app_guid" "$bindir"
+    chmod 775 "$bindir"
+
+    # Limpiar archivos temporales
+    rm -rf "$temp_dir"
+
+    # Crear directorio de datos
+    log "INFO" "Creando directorio de datos en [$datadir]..."
+    mkdir -p "$datadir"
+    chown -R "$app_uid":"$app_guid" "$datadir"
+    chmod 775 "$datadir"
+
+    # Asegurar que se verifique si hay actualizaciones
+    touch "$datadir/update_required"
+    chown "$app_uid":"$app_guid" "$datadir/update_required"
+
+    # Crear archivo de servicio systemd
+    service_file="/etc/systemd/system/$app.service"
+    log "INFO" "Creando archivo de servicio systemd en [$service_file]..."
+
+    cat <<EOF > "$service_file"
 [Unit]
 Description=${app^} Daemon
-After=syslog.target network.target
+After=network.target
+
 [Service]
 User=$app_uid
 Group=$app_guid
@@ -212,27 +204,39 @@ ExecStart=$bindir/$app_bin -nobrowser -data=$datadir
 TimeoutStopSec=20
 KillMode=process
 Restart=on-failure
+
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Start the App
-echo "Service file created. Attempting to start the app"
-systemctl -q daemon-reload
-systemctl enable --now -q "$app"
+    # Recargar daemon de systemd y habilitar el servicio
+    log "INFO" "Habilitando e iniciando el servicio $app..."
+    systemctl daemon-reload
+    systemctl enable "$app"
+    systemctl start "$app"
 
-# Finish Update/Installation
-host=$(hostname -I)
-ip_local=$(grep -oP '^\S*' <<<"$host")
-echo ""
-echo "Install complete"
-sleep 10
-STATUS="$(systemctl is-active $app)"
-if [ "${STATUS}" = "active" ]; then
-    echo "Browse to http://$ip_local:$app_port for the ${app^} GUI"
-else
-    echo "${app^} failed to start"
-fi
+    # Verificar el estado del servicio
+    sleep 10
+    if systemctl is-active --quiet "$app"; then
+        host=$(hostname -I | awk '{print $1}')
+        log "INFO" "${app^} instalado y ejecutándose correctamente."
+        log "INFO" "Accede a la interfaz web en http://$host:$app_port"
+    else
+        log "ERROR" "${app^} no se está ejecutando correctamente."
+        systemctl status "$app"
+        return 1
+    fi
 
-# Exit
+    return 0
+}
+
+# Instalar cada aplicación
+for app in "${apps[@]}"; do
+    install_app "$app" || log "ERROR" "Error al instalar $app"
+done
+
+log "INFO" "Todas las aplicaciones \*Arr han sido instaladas."
+
 exit 0
+
+

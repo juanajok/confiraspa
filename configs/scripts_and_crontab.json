@@ -1,0 +1,27 @@
+[
+  {
+    "script": "change_permissions.sh",
+    "schedule": "0 * * * *",
+    "interpreter": null
+  },
+  {
+    "script": "backup_rsync.sh",
+    "schedule": "0 2 * * *",
+    "interpreter": null
+  },
+  {
+    "script": "rotabackup.py",
+    "schedule": "0 3 * * *",
+    "interpreter": "/usr/bin/python3"
+  },
+  {
+    "script": "downloadclean.py",
+    "schedule": "0 5 * * *",
+    "interpreter": "/usr/bin/python3"
+  },
+  {
+    "script": "backup_rclone.sh",
+    "schedule": "0 4 * * *",
+    "interpreter": null
+  }
+]

@@ -1,31 +1,55 @@
 #!/bin/bash
+set -euo pipefail
 
-# Función de registro para imprimir mensajes con marca de tiempo
+# Script Name: install_mono.sh
+# Description: Script para instalar Mono en sistemas Debian/Ubuntu
+# Author: [Tu Nombre]
+# Version: 1.1.0
+# Date: [Fecha Actual]
+# License: GNU
+# Usage: Ejecuta el script con privilegios de superusuario
+# Notes: Asegúrate de tener conexión a Internet y privilegios de superusuario
+
+# Función de registro para imprimir mensajes con marca de tiempo y nivel de log
 log() {
-    local message="$1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [${FUNCNAME[1]}] $message"
+    local level="$1"
+    local message="$2"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message"
 }
 
-# Imprime un mensaje indicando que se está instalando Mono
-log "9) Instalando Mono..."
+# Verificar si se ejecuta como root
+if [[ $EUID -ne 0 ]]; then
+    log "ERROR" "Este script debe ejecutarse con privilegios de superusuario (sudo)."
+    exit 1
+fi
 
-# Verifica si Mono ya está instalado
+log "INFO" "9) Instalando Mono..."
+
+# Verificar si Mono ya está instalado
 if dpkg -s mono-devel >/dev/null 2>&1; then
-    log "Mono ya está instalado."
+    log "INFO" "Mono ya está instalado."
     exit 0
 fi
 
-# Instala dependencias y agrega el repositorio de Mono
-apt install -y apt-transport-https dirmngr gnupg ca-certificates
+# Instalar dependencias necesarias
+log "INFO" "Instalando dependencias..."
+apt-get update
+apt-get install -y apt-transport-https dirmngr gnupg ca-certificates
 
-# Agrega la clave del repositorio de Mono
-apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+# Agregar la clave GPG del repositorio de Mono
+log "INFO" "Agregando clave GPG del repositorio de Mono..."
+wget -qO- https://download.mono-project.com/repo/xamarin.gpg | gpg --dearmor > /usr/share/keyrings/mono-archive-keyring.gpg
 
-# Agrega el repositorio de Mono a la lista de fuentes
-echo "deb https://download.mono-project.com/repo/debian stable-buster main" | tee /etc/apt/sources.list.d/mono-official-stable.list
+# Agregar el repositorio de Mono a la lista de fuentes
+log "INFO" "Agregando el repositorio de Mono..."
+echo "deb [signed-by=/usr/share/keyrings/mono-archive-keyring.gpg] https://download.mono-project.com/repo/debian stable-buster main" | tee /etc/apt/sources.list.d/mono-official-stable.list
 
-# Actualiza la lista de paquetes y instala Mono
-apt update
-apt install -y mono-devel
+# Actualizar la lista de paquetes e instalar Mono
+log "INFO" "Actualizando la lista de paquetes..."
+apt-get update
 
-log "Mono instalado con éxito."
+log "INFO" "Instalando Mono..."
+apt-get install -y mono-devel
+
+log "INFO" "Mono instalado con éxito."
+

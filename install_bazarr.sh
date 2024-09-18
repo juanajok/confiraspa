@@ -1,83 +1,117 @@
 #!/bin/bash
+set -e
 
-# Función de registro para imprimir mensajes con marca de tiempo
+# Script Name: install_bazarr.sh
+# Description: Este script instala y configura Bazarr en una Raspberry Pi con Raspbian OS.
+# Author: [Tu Nombre]
+# Version: 1.1.0
+# Date: [Fecha]
+# License: MIT License
+
+# Función de registro para imprimir mensajes con marca de tiempo y nivel de log
 log() {
-    local message="$1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message"
+    local level="$1"
+    local message="$2"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message"
 }
 
-log "Instalando dependencias de Bazarr..."
-
-# Instalar dependencias necesarias para Bazarr
-sudo apt-get install -y libxml2-dev libxslt1-dev python3-dev python3-libxml2 python3-lxml unrar-free ffmpeg libatlas-base-dev python3-venv
-
-# Verificar si unzip está instalado, si no, lo instala
-if ! command -v unzip > /dev/null; then
-    sudo apt-get install -y unzip
+# Verificar si se ejecuta como root
+if [[ $EUID -ne 0 ]]; then
+    log "ERROR" "Este script debe ser ejecutado con privilegios de superusuario (sudo)."
+    exit 1
 fi
 
+# Usuario que ejecutará Bazarr
+usuario="${SUDO_USER:-$(whoami)}"
+
+log "INFO" "Instalando dependencias de Bazarr..."
+
+# Actualizar lista de paquetes
+apt-get update
+
+# Instalar dependencias necesarias para Bazarr
+apt-get install -y \
+    libxml2-dev \
+    libxslt1-dev \
+    python3-dev \
+    python3-libxml2 \
+    python3-lxml \
+    unrar-free \
+    ffmpeg \
+    libatlas-base-dev \
+    python3-venv \
+    unzip
+
 # Crear directorio para Bazarr
-log "Creando directorio para Bazarr..."
-sudo mkdir -p /opt/bazarr
+log "INFO" "Creando directorio para Bazarr..."
+install_dir="/opt/bazarr"
+mkdir -p "$install_dir"
 
 # Descargar y descomprimir Bazarr
-log "Descargando y descomprimiendo Bazarr..."
-sudo wget -P /opt/bazarr https://github.com/morpheus65535/bazarr/releases/latest/download/bazarr.zip
-sudo unzip -d /opt/bazarr /opt/bazarr/bazarr.zip
-sudo rm /opt/bazarr/bazarr.zip
+log "INFO" "Descargando y descomprimiendo Bazarr..."
+bazarr_zip_url="https://github.com/morpheus65535/bazarr/releases/latest/download/bazarr.zip"
+wget -O "$install_dir/bazarr.zip" "$bazarr_zip_url"
+unzip -q -d "$install_dir" "$install_dir/bazarr.zip"
+rm "$install_dir/bazarr.zip"
 
 # Crear entorno virtual
-log "Creando entorno virtual para Bazarr..."
-sudo python3 -m venv /opt/bazarr/venv
+log "INFO" "Creando entorno virtual para Bazarr..."
+python3 -m venv "$install_dir/venv"
 
-# Activar entorno virtual e instalar dependencias de Bazarr
-log "Instalando dependencias de Bazarr en el entorno virtual..."
-sudo /opt/bazarr/venv/bin/pip install -r /opt/bazarr/requirements.txt
+# Instalar dependencias de Bazarr en el entorno virtual
+log "INFO" "Instalando dependencias de Bazarr en el entorno virtual..."
+"$install_dir/venv/bin/pip" install -U pip
+"$install_dir/venv/bin/pip" install -r "$install_dir/requirements.txt"
 
-# Si la arquitectura es armv6l, reinstala numpy
-if [ "$(uname -m)" = "armv6l" ]; then
-    sudo /opt/bazarr/venv/bin/pip uninstall -y numpy
-    sudo apt-get install -y python3-numpy
+# Ajustes para arquitecturas específicas
+arch=$(uname -m)
+if [[ "$arch" == "armv6l" ]] || [[ "$arch" == "armv7l" ]] || [[ "$arch" == "aarch64" ]]; then
+    log "INFO" "Arquitectura $arch detectada. Realizando ajustes..."
+    "$install_dir/venv/bin/pip" uninstall -y numpy
+    apt-get install -y python3-numpy
 fi
 
 # Establecer permisos y propietario adecuados
-log "Estableciendo permisos para Bazarr..."
-sudo chown -R $USER:$USER /opt/bazarr
-sudo chmod -R 755 /opt/bazarr
+log "INFO" "Estableciendo permisos para Bazarr..."
+chown -R "$usuario":"$usuario" "$install_dir"
+chmod -R 755 "$install_dir"
 
 # Crear archivo de servicio systemd para Bazarr
-log "Creando archivo de servicio systemd para Bazarr..."
-cat << EOF | sudo tee /etc/systemd/system/bazarr.service
+log "INFO" "Creando archivo de servicio systemd para Bazarr..."
+cat > /etc/systemd/system/bazarr.service << EOF
 [Unit]
 Description=Bazarr Daemon
-After=syslog.target network.target
+After=network.target
 
 [Service]
-WorkingDirectory=/opt/bazarr
-User=$USER
-Group=$USER
+WorkingDirectory=$install_dir
+User=$usuario
+Group=$usuario
 UMask=0002
+Type=simple
+ExecStart=$install_dir/venv/bin/python $install_dir/bazarr.py
 Restart=on-failure
 RestartSec=5
-Type=simple
-ExecStart=/opt/bazarr/venv/bin/python /opt/bazarr/bazarr.py
-KillSignal=SIGINT
 TimeoutStopSec=20
 SyslogIdentifier=bazarr
-ExecStartPre=/bin/sleep 30
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Habilitar y arrancar el servicio Bazarr
-log "Habilitando y arrancando el servicio Bazarr..."
-sudo systemctl daemon-reload
-sudo systemctl enable bazarr
-sudo systemctl start bazarr
+# Recargar systemd y habilitar el servicio
+log "INFO" "Habilitando y arrancando el servicio Bazarr..."
+systemctl daemon-reload
+systemctl enable bazarr
+systemctl start bazarr
 
 # Verificar el estado del servicio
-log "Verificando el estado del servicio Bazarr..."
-sudo systemctl status bazarr
+if systemctl is-active --quiet bazarr; then
+    log "INFO" "Bazarr se está ejecutando correctamente."
+else
+    log "ERROR" "Bazarr no se está ejecutando."
+    journalctl -u bazarr --no-pager
+    exit 1
+fi
 
-log "Instalación y configuración de Bazarr completada."
+log "INFO" "Instalación y configuración de Bazarr completada."

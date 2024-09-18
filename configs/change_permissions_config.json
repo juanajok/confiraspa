@@ -1,0 +1,9 @@
+{
+  "usuario": "nombre_usuario",
+  "permisos": "777",
+  "directorios": [
+      "/ruta/al/directorio1",
+      "/ruta/al/directorio con espacios",
+      "/otra/ruta/directorio2"
+  ]
+}

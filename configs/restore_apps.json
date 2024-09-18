@@ -1,7 +1,7 @@
 {
     "lidarr": {
         "backup_dir": "/media/Backup/lidarr/scheduled",
-        "backup_ext": "zip",
+        "backup_ext": ".zip",
         "restore_dir": "/var/lib/lidarr",
         "files_to_restore": [
             "lidarr.db",
@@ -14,7 +14,7 @@
     },
     "radarr": {
         "backup_dir": "/media/Backup/radarr/scheduled",
-        "backup_ext": "zip",
+        "backup_ext": ".zip",
         "restore_dir": "/var/lib/radarr",
         "files_to_restore": [
             "radarr.db",
@@ -27,7 +27,7 @@
     },
     "sonarr": {
         "backup_dir": "/media/Backup/sonarr/scheduled",
-        "backup_ext": "zip",
+        "backup_ext": ".zip",
         "restore_dir": "/var/lib/sonarr",
         "files_to_restore": [
             "sonarr.db",
@@ -40,7 +40,7 @@
     },
     "prowlarr": {
         "backup_dir": "/media/Backup/prowlarr/scheduled",
-        "backup_ext": "zip",
+        "backup_ext": ".zip",
         "restore_dir": "/var/lib/prowlarr",
         "files_to_restore": [
             "prowlarr.db",
@@ -53,7 +53,7 @@
     },
     "whisparr": {
         "backup_dir": "/media/Backup/whisparr/scheduled",
-        "backup_ext": "zip",
+        "backup_ext": ".zip",
         "restore_dir": "/var/lib/whisparr",
         "files_to_restore": [
             "whisparr2.db",
@@ -67,13 +67,12 @@
     "Plex": {
         "backup_dir": "/media/Backup/plexmediaserver",
         "backup_ext": "",
-        "restore_dir": "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Preferences.xml",
+        "restore_dir": "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server",
         "files_to_restore": [
-            "preferences.xml"
+            "Preferences.xml"
         ],
         "file_permissions": {
-            "whisparr2.db": "775",
-            "config.xml": "775"
+            "Preferences.xml": "644"
         }
     },
     "rclone": {
@@ -84,8 +83,7 @@
             "rclone.conf"
         ],
         "file_permissions": {
-            "whisparr2.db": "600",
-            "config.xml": "600"
+            "rclone.conf": "600"
         }
     }
 }

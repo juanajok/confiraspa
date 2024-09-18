@@ -1,113 +1,112 @@
-#!/bin/bash
 
-# Script Name: confiraspi
-# Description: cript con los pasos para reinstalar la raspa
+#!/bin/bash
+set -euo pipefail
+
+# Script Name: confiraspi.sh
+# Description: Script para configurar una Raspberry Pi ejecutando varios scripts en orden.
 # Author: Juan José Hipólito
-# Version: 2..0.0
+# Version: 2.1.0
 # Date: 2023-03-30
 # License: GNU
-# Usage: Debes ejecutar el script desde la ruta donde estén los ficheros
-#   dhcpcd.conf
-#   settings.json
-#   smb.conf
-# Dependencies: No tiene
-# Notes: Este script tiene como objetivo configurar una Raspberry Pi con varios servicios y programas, como Samba, XRDP, Transmission, Mono, Sonarr, Webmin, VNC, Plex, Bazarr y aMule. A continuación, se describen brevemente las funciones principales de cada uno de estos servicios y programas:
+# Usage: Ejecuta este script desde cualquier ruta; se encargará de encontrar los scripts necesarios.
+# Dependencies: Verifica que todos los comandos necesarios están instalados.
+# Notes: Este script configura una Raspberry Pi con varios servicios y programas.
 
-#Samba: Permite compartir archivos y directorios a través de una red local.
-#XRDP: Habilita el acceso remoto al escritorio de la Raspberry Pi.
-#Transmission: Cliente de torrent para descargar y compartir archivos.
-#Mono: Entorno de desarrollo para ejecutar aplicaciones basadas en .NET.
-#Sonarr: Gestiona automáticamente tus series de TV y descarga nuevos episodios.
-#Webmin: Herramienta de administración de sistemas basada en web para Linux.
-#VNC: Permite el control remoto gráfico de una Raspberry Pi.
-#Plex: Servidor de medios para organizar y transmitir películas, series de TV y música.
-#Bazarr: Permite la descarga automática de subtítulos para tus series y películas.
-#aMule: Cliente P2P para compartir archivos a través de la red eD2k y Kademlia.
-
-
-# Función de registro para imprimir mensajes con marca de tiempo
+# Función de registro para imprimir mensajes con marca de tiempo y nivel de log
 log() {
-    local message="$1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [${FUNCNAME[1]}] $message"
+    local level="$1"
+    local message="$2"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message"
+}
+
+# Función para verificar que los comandos requeridos están disponibles
+check_dependencies() {
+    local required_commands=(
+        "chmod" "bash" "jq"
+    )
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" &> /dev/null; then
+            log "ERROR" "El comando '$cmd' no está instalado. Instálalo antes de continuar."
+            exit 1
+        fi
+    done
+    log "INFO" "Todas las dependencias necesarias están disponibles."
+}
+
+# Función para verificar la existencia y permisos de un script antes de ejecutarlo
+check_script() {
+    local script_path="$1"
+    if [ ! -f "$script_path" ]; then
+        log "ERROR" "El script '$script_path' no existe."
+        exit 1
+    fi
+    if [ ! -x "$script_path" ]; then
+        log "INFO" "Asignando permisos de ejecución a '$script_path'..."
+        chmod +x "$script_path"
+    fi
+}
+
+# Función para ejecutar un script y manejar errores
+run_script() {
+    local script_path="$1"
+    check_script "$script_path"
+    log "INFO" "Ejecutando '$script_path'..."
+    if ! "$script_path"; then
+        log "ERROR" "La ejecución de '$script_path' ha fallado."
+        exit 1
+    fi
 }
 
 # Función principal que coordina la ejecución de los scripts
-main() {    # Añadir permisos de ejecución a todos los scripts
-    log "Asignando permisos de ejecución a los scripts..."
-    chmod +x /opt/confiraspa/*.sh
-    # Actualiza el sistema y asegura que las dependencias básicas están instaladas
-    log "1) Actualizando el sistema..."
-    ./update_system.sh
+main() {
+    # Verificar si se ejecuta como root
+    if [[ $EUID -ne 0 ]]; then
+        log "ERROR" "Este script debe ejecutarse con privilegios de superusuario (sudo)."
+        exit 1
+    fi
 
-    # Lee las credenciales y asegura que se está ejecutando como superusuario
-    log "2) Configurando las credenciales..."
-    ./setup_credentials.sh
+    # Directorio de los scripts
+    SCRIPTS_DIR="/opt/confiraspi"
 
-    # Configura una IP estática usando nmcli
-    #./configure_static_ip.sh
+    # Verificar que el directorio de scripts existe
+    if [ ! -d "$SCRIPTS_DIR" ]; then
+        log "ERROR" "El directorio de scripts '$SCRIPTS_DIR' no existe."
+        exit 1
+    fi
 
-    # Crea los puntos de montaje especificados en un archivo JSON
-    log "4) Creando puntos de montaje..."
-    ./create_mount_points.sh
+    # Verifica que todas las dependencias estén disponibles
+    check_dependencies
 
-    
-    # Genera entradas para el archivo fstab
-    log "5) Generando fstab..."
-    ./generate_fstab.sh
+    # Lista de scripts a ejecutar en orden
+    scripts=(
+        "update_system.sh"
+        "setup_credentials.sh"
+        "create_mount_points.sh"
+        "generate_fstab.sh"
+        "install_samba.sh"
+        "install_xrdp.sh"
+        "install_transmission.sh"
+        "install_mono.sh"
+        "install_sonarr.sh"
+        "install_webmin.sh"
+        "enable_vnc.sh"
+        "install_plex.sh"
+        "install_bazarr.sh"
+        "install_amule.sh"
+        "configure_crontab.sh"
+        "install_rclone.sh"
+        "setup_logrotate_from_json.sh"
+    )
 
-    # Instala y configura Samba
-    log "6) Instalando Samba..."
-    ./install_samba.sh
+    log "INFO" "Iniciando configuración de la Raspberry Pi..."
 
-    # Instala y configura XRDP
-    log "7) Instalando XRDP..."
-    ./install_xrdp.sh
+    # Iterar sobre la lista de scripts y ejecutarlos
+    for script_name in "${scripts[@]}"; do
+        script_path="$SCRIPTS_DIR/$script_name"
+        run_script "$script_path"
+    done
 
-    # Instala y configura Transmission
-    log "8) Instalando Transmission..."
-    ./install_transmission.sh
-
-    # Instala Mono
-    log "9) Instalando Mono..."
-    ./install_mono.sh
-
-    # Instala Sonarr
-    log "10) Instalando Sonarr..."
-    ./install_sonarr.sh
-
-    # Instala Webmin
-    log "11) Instalando Webmin..."
-    ./install_webmin.sh
-
-    # Habilita VNC
-    log "12) Habilitando VNC..."
-    ./enable_vnc.sh
-
-    # Instala Plex Media Server
-    log "13) Instalando Plex..."
-    ./install_plex.sh
-
-    # Instala y configura Bazarr
-    log "14) Instalando Bazarr..."
-    ./install_bazarr.sh
-
-    # Instala y configura aMule
-    log "15) Instalando aMule..."
-    ./install_amule.sh
-
-    # Configura las tareas programadas en crontab
-    log "16) Configurando crontab..."
-    ./configure_crontab.sh
-
-    # Instala y configura RClone
-    log "16) Instalando RClone..."
-    ./install_rclone.sh
-
-    # Configura el rotado de logs
-    log "16) Instalando RClone..."
-    ./setup_logrotate_from_json.sh
-    
-    log "Info: script finalizado, por favor reinicia para que los cambios tengan efecto"
+    log "INFO" "Configuración completa. Reinicia el sistema para aplicar todos los cambios: sudo reboot."
 }
 
 # Llama a la función principal
