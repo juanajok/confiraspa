@@ -1,4 +1,3 @@
-
 #!/bin/bash
 set -euo pipefail
 
@@ -59,14 +58,23 @@ run_script() {
 
 # Función principal que coordina la ejecución de los scripts
 main() {
+    # Verificar si se pasó un argumento para el directorio de scripts
+    if [ $# -gt 1 ]; then
+        log "ERROR" "Uso: $0 [DIRECTORIO_DE_SCRIPTS]"
+        exit 1
+    fi
+
+    # Directorio de los scripts (por defecto /opt/confiraspa)
+    local SCRIPTS_DIR="/opt/confiraspa"
+    if [ $# -eq 1 ]; then
+        SCRIPTS_DIR="$1"
+    fi
+
     # Verificar si se ejecuta como root
     if [[ $EUID -ne 0 ]]; then
         log "ERROR" "Este script debe ejecutarse con privilegios de superusuario (sudo)."
         exit 1
     fi
-
-    # Directorio de los scripts
-    SCRIPTS_DIR="/opt/confiraspi"
 
     # Verificar que el directorio de scripts existe
     if [ ! -d "$SCRIPTS_DIR" ]; then
@@ -109,5 +117,5 @@ main() {
     log "INFO" "Configuración completa. Reinicia el sistema para aplicar todos los cambios: sudo reboot."
 }
 
-# Llama a la función principal
-main
+# Llama a la función principal con todos los argumentos pasados
+main "$@"

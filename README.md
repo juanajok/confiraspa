@@ -95,7 +95,7 @@ Puntos de montaje: Edite el archivo puntos_de_montaje.json y añada los puntos d
 Ejecutar el script
 
 
-sudo ./confiraspi.sh
+sudo bash ./confiraspi_v5.sh
 Siga las instrucciones en pantalla y espere a que se complete la ejecución del script.
 
 Dependencias
