@@ -1,6 +1,6 @@
 {
-    "download-dir": "/media/discoduro/torrents/completos",
-    "incomplete-dir": "/media/discoduro/torrents/temp",
+    "download-dir": "/media/DiscoDuro/torrents/completos",
+    "incomplete-dir": "/media/DiscoDuro/torrents/temp",
     "incomplete-dir-enabled": true,
     "rpc-authentication-required": true,
     "rpc-enabled": true,

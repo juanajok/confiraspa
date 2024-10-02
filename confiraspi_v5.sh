@@ -1,35 +1,66 @@
 #!/bin/bash
 set -euo pipefail
 
-# Script Name: confiraspi.sh
-# Description: Script para configurar una Raspberry Pi ejecutando varios scripts en orden.
+# Script Name: confiraspi_v5.sh
+# Description: Script para configurar una Raspberry Pi ejecutando varios scripts en orden de manera idempotente y desatendida.
 # Author: Juan José Hipólito
-# Version: 2.1.0
-# Date: 2023-03-30
+# Version: 2.2.0
+# Date: 2024-10-02
 # License: GNU
-# Usage: Ejecuta este script desde cualquier ruta; se encargará de encontrar los scripts necesarios.
-# Dependencies: Verifica que todos los comandos necesarios están instalados.
-# Notes: Este script configura una Raspberry Pi con varios servicios y programas.
+# Usage: Ejecuta este script con sudo: sudo bash confiraspi_v5.sh [DIRECTORIO_DE_SCRIPTS]
+# Dependencies: Verifica e instala automáticamente las dependencias necesarias.
+# Notes: Este script configura una Raspberry Pi con varios servicios y programas de manera segura y automatizada.
+
+# Variables
+DEFAULT_SCRIPTS_DIR="/opt/confiraspa"
+LOG_FILE="/var/log/confiraspi_v5.log"
 
 # Función de registro para imprimir mensajes con marca de tiempo y nivel de log
 log() {
     local level="$1"
     local message="$2"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" | tee -a "$LOG_FILE"
 }
 
-# Función para verificar que los comandos requeridos están disponibles
-check_dependencies() {
+# Función para verificar que los comandos requeridos están disponibles e instalarlos si falta alguno
+check_and_install_dependencies() {
     local required_commands=(
-        "chmod" "bash" "jq"
+        "chmod" 
+        "bash" 
+        "jq"
+        "apt-get"
+        "sudo"
     )
+    local missing_commands=()
+
     for cmd in "${required_commands[@]}"; do
         if ! command -v "$cmd" &> /dev/null; then
-            log "ERROR" "El comando '$cmd' no está instalado. Instálalo antes de continuar."
-            exit 1
+            missing_commands+=("$cmd")
         fi
     done
-    log "INFO" "Todas las dependencias necesarias están disponibles."
+
+    if [ ${#missing_commands[@]} -ne 0 ]; then
+        log "INFO" "Instalando dependencias faltantes: ${missing_commands[*]}"
+        apt-get update -y
+
+        for cmd in "${missing_commands[@]}"; do
+            case "$cmd" in
+                "jq")
+                    apt-get install -y jq
+                    ;;
+                "chmod"|"bash"|"sudo"|"apt-get")
+                    # Estas herramientas deberían estar presentes en casi todas las distribuciones de Linux.
+                    log "ERROR" "El comando '$cmd' es esencial pero no está instalado. Por favor, instálalo manualmente."
+                    exit 1
+                    ;;
+                *)
+                    log "WARNING" "Comando desconocido '$cmd' necesita instalación."
+                    ;;
+            esac
+        done
+    else
+        log "INFO" "Todas las dependencias necesarias están instaladas."
+    fi
 }
 
 # Función para verificar la existencia y permisos de un script antes de ejecutarlo
@@ -50,22 +81,33 @@ run_script() {
     local script_path="$1"
     check_script "$script_path"
     log "INFO" "Ejecutando '$script_path'..."
-    if ! "$script_path"; then
-        log "ERROR" "La ejecución de '$script_path' ha fallado."
+    if ! "$script_path" >> "$LOG_FILE" 2>&1; then
+        log "ERROR" "La ejecución de '$script_path' ha fallado. Revisa el log para más detalles."
         exit 1
     fi
+    log "INFO" "Script '$script_path' ejecutado correctamente."
+}
+
+# Función para mostrar el uso del script
+usage() {
+    echo "Uso: sudo bash $0 [DIRECTORIO_DE_SCRIPTS]"
+    echo "Si no se especifica DIRECTORIO_DE_SCRIPTS, se usará '$DEFAULT_SCRIPTS_DIR'."
+    exit 1
 }
 
 # Función principal que coordina la ejecución de los scripts
 main() {
+    # Redirigir todos los logs al archivo de log
+    touch "$LOG_FILE"
+    chmod 644 "$LOG_FILE"
+
     # Verificar si se pasó un argumento para el directorio de scripts
     if [ $# -gt 1 ]; then
-        log "ERROR" "Uso: $0 [DIRECTORIO_DE_SCRIPTS]"
-        exit 1
+        usage
     fi
 
-    # Directorio de los scripts (por defecto /opt/confiraspa)
-    local SCRIPTS_DIR="/opt/confiraspa"
+    # Directorio de los scripts (por defecto /opt/confiraspi)
+    local SCRIPTS_DIR="$DEFAULT_SCRIPTS_DIR"
     if [ $# -eq 1 ]; then
         SCRIPTS_DIR="$1"
     fi
@@ -82,8 +124,8 @@ main() {
         exit 1
     fi
 
-    # Verifica que todas las dependencias estén disponibles
-    check_dependencies
+    # Verifica que todas las dependencias estén disponibles o las instala
+    check_and_install_dependencies
 
     # Lista de scripts a ejecutar en orden
     scripts=(
@@ -119,3 +161,4 @@ main() {
 
 # Llama a la función principal con todos los argumentos pasados
 main "$@"
+

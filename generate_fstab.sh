@@ -1,29 +1,13 @@
 #!/bin/bash
-
-# Script Name: configure_fstab.sh
-# Description: Este script configura el archivo /etc/fstab para montar particiones específicas en directorios designados. Crea copias de seguridad del archivo original, verifica la existencia de las particiones y añade nuevas entradas para su montaje automático.
-# Author: [Tu Nombre]
-# Version: 1.0.0
-# Date: [Fecha de Creación]
-# License: MIT License
-# Usage: Ejecutar este script con privilegios de superusuario (sudo).
-# Requirements: blkid, mount
-# Notes:
-#   - El script verifica que se ejecute como root antes de proceder.
-#   - Crea una copia de seguridad del archivo /etc/fstab antes de realizar cambios.
-#   - Añade entradas de montaje al archivo /etc/fstab solo si las particiones necesarias están disponibles.
-#   - Revierta los cambios si ocurre un error al montar las nuevas entradas.
-# Dependencies:
-#   - blkid: Utilizado para obtener UUIDs y tipos de sistemas de archivos de las particiones.
-#   - mount: Utilizado para probar las nuevas entradas en el archivo /etc/fstab.
-# Important: Este script debe ser ejecutado con privilegios de superusuario (sudo).
-
 set -e
+
+# Archivo de log
+LOG_FILE="/var/log/confiraspi_v5.log"
 
 # Función de registro para imprimir mensajes con marca de tiempo
 log() {
     local message="$1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" | tee -a "$LOG_FILE"
 }
 
 # Verificar si se ejecuta como root
@@ -57,9 +41,26 @@ discoduro_device=$(get_uuid_by_label "DiscoDuro")
 backup_device=$(get_uuid_by_label "Backup")
 wdelements_device=$(get_uuid_by_label "WDElements")
 
+# Agregar mensajes de depuración
+log "DEBUG: discoduro_device = $discoduro_device"
+log "DEBUG: backup_device = $backup_device"
+log "DEBUG: wdelements_device = $wdelements_device"
+
 # Verificar que las particiones existen
-if [ -z "$discoduro_device" ] || [ -z "$backup_device" ] || [ -z "$wdelements_device" ]; then
-    log "Error: No se pudieron encontrar todas las particiones necesarias."
+missing_partitions=()
+
+if [ -z "$discoduro_device" ]; then
+    missing_partitions+=("DiscoDuro")
+fi
+if [ -z "$backup_device" ]; then
+    missing_partitions+=("Backup")
+fi
+if [ -z "$wdelements_device" ]; then
+    missing_partitions+=("WDElements")
+fi
+
+if [ ${#missing_partitions[@]} -ne 0 ]; then
+    log "Error: No se pudieron encontrar las siguientes particiones: ${missing_partitions[*]}"
     exit 1
 fi
 
@@ -68,10 +69,20 @@ discoduro_uuid=$(blkid -s UUID -o value "$discoduro_device")
 backup_uuid=$(blkid -s UUID -o value "$backup_device")
 wdelements_uuid=$(blkid -s UUID -o value "$wdelements_device")
 
+# Agregar mensajes de depuración
+log "DEBUG: discoduro_uuid = $discoduro_uuid"
+log "DEBUG: backup_uuid = $backup_uuid"
+log "DEBUG: wdelements_uuid = $wdelements_uuid"
+
 # Obtener sistemas de archivos
 discoduro_fstype=$(blkid -s TYPE -o value "$discoduro_device")
 backup_fstype=$(blkid -s TYPE -o value "$backup_device")
 wdelements_fstype=$(blkid -s TYPE -o value "$wdelements_device")
+
+# Agregar mensajes de depuración
+log "DEBUG: discoduro_fstype = $discoduro_fstype"
+log "DEBUG: backup_fstype = $backup_fstype"
+log "DEBUG: wdelements_fstype = $wdelements_fstype"
 
 # Definir las nuevas entradas para el archivo fstab
 new_entries="UUID=$discoduro_uuid  /media/discoduro        $discoduro_fstype    defaults,nofail        0       0
