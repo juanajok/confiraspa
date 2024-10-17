@@ -16,7 +16,7 @@ log "Configurando comandos de crontab..."
 
 # Directorio del script
 script_path=$(dirname "$(realpath "$0")")
-config_path="$script_path/../configs/scripts_and_crontab.json"
+config_path="$script_path/configs/scripts_and_crontab.json"
 
 # Leer y procesar el JSON
 json_data=$(cat "$config_path")
@@ -27,7 +27,7 @@ echo "$json_data" | jq -c '.[]' | while read -r entry; do
     schedule=$(echo "$entry" | jq -r '.schedule')
     interpreter=$(echo "$entry" | jq -r '.interpreter')
 
-    script_full_path="$script_path/../scripts/$script"
+    script_full_path="opt/confiraspa/$script"
 
     # Aplicar permisos ejecutables
     log "Aplicando permisos ejecutables a $script_full_path..."

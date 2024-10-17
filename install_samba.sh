@@ -37,7 +37,7 @@ if [ ! -f /etc/samba/smb.conf.old ]; then
 fi
 
 # Verifica si el archivo de configuración personalizado existe en /configs
-CONFIG_DIR="/configs"
+CONFIG_DIR="/opt/confiraspa/configs"
 CUSTOM_SMB_CONF="$CONFIG_DIR/smb.conf"
 
 if [ -f "$CUSTOM_SMB_CONF" ]; then

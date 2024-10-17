@@ -4,7 +4,7 @@ set -e
 # Script Name: install_bazarr.sh
 # Description: Este script instala y configura Bazarr en una Raspberry Pi con Raspbian OS.
 # Author: [Tu Nombre]
-# Version: 1.1.0
+# Version: 1.1.1
 # Date: [Fecha]
 # License: MIT License
 
@@ -43,31 +43,47 @@ apt-get install -y \
     unzip
 
 # Crear directorio para Bazarr
-log "INFO" "Creando directorio para Bazarr..."
 install_dir="/opt/bazarr"
-mkdir -p "$install_dir"
+
+if [ ! -d "$install_dir" ]; then
+    log "INFO" "Creando directorio para Bazarr..."
+    mkdir -p "$install_dir"
+    chown -R "$usuario":"$usuario" "$install_dir"
+    chmod -R 755 "$install_dir"
+fi
 
 # Descargar y descomprimir Bazarr
 log "INFO" "Descargando y descomprimiendo Bazarr..."
-bazarr_zip_url="https://github.com/morpheus65535/bazarr/releases/latest/download/bazarr.zip"
-wget -O "$install_dir/bazarr.zip" "$bazarr_zip_url"
-unzip -q -d "$install_dir" "$install_dir/bazarr.zip"
-rm "$install_dir/bazarr.zip"
 
-# Crear entorno virtual
-log "INFO" "Creando entorno virtual para Bazarr..."
-python3 -m venv "$install_dir/venv"
+bazarr_zip_url="https://github.com/morpheus65535/bazarr/releases/latest/download/bazarr.zip"
+bazarr_zip_file="$install_dir/bazarr.zip"
+
+# Descargar bazarr.zip solo si no existe o si hay una versión más reciente
+wget -O "$bazarr_zip_file" "$bazarr_zip_url"
+
+# Descomprimir bazarr.zip, sobrescribiendo archivos sin preguntar
+unzip -oq -d "$install_dir" "$bazarr_zip_file"
+
+# Eliminar el archivo bazarr.zip después de descomprimir
+rm "$bazarr_zip_file"
+
+# Crear entorno virtual si no existe
+if [ ! -d "$install_dir/venv" ]; then
+    log "INFO" "Creando entorno virtual para Bazarr..."
+    python3 -m venv "$install_dir/venv"
+fi
 
 # Instalar dependencias de Bazarr en el entorno virtual
 log "INFO" "Instalando dependencias de Bazarr en el entorno virtual..."
 "$install_dir/venv/bin/pip" install -U pip
-"$install_dir/venv/bin/pip" install -r "$install_dir/requirements.txt"
+"$install_dir/venv/bin/pip" install -U wheel setuptools
+"$install_dir/venv/bin/pip" install -U -r "$install_dir/requirements.txt"
 
 # Ajustes para arquitecturas específicas
 arch=$(uname -m)
 if [[ "$arch" == "armv6l" ]] || [[ "$arch" == "armv7l" ]] || [[ "$arch" == "aarch64" ]]; then
     log "INFO" "Arquitectura $arch detectada. Realizando ajustes..."
-    "$install_dir/venv/bin/pip" uninstall -y numpy
+    "$install_dir/venv/bin/pip" uninstall -y numpy || true
     apt-get install -y python3-numpy
 fi
 
@@ -103,7 +119,7 @@ EOF
 log "INFO" "Habilitando y arrancando el servicio Bazarr..."
 systemctl daemon-reload
 systemctl enable bazarr
-systemctl start bazarr
+systemctl restart bazarr
 
 # Verificar el estado del servicio
 if systemctl is-active --quiet bazarr; then
