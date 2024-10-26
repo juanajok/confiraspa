@@ -3,7 +3,7 @@
 # Script Name: install_amule.sh
 # Description: Instala y configura aMule y sus servicios en una Raspberry Pi con Raspbian OS.
 # Author: [Tu Nombre]
-# Version: 1.2.1
+# Version: 1.3.0
 # Date: [Fecha]
 # License: MIT License
 
@@ -303,9 +303,9 @@ configure_amule() {
     update_ini "$amule_conf" "eMule" "UserNick" "$usuario"
     update_ini "$amule_conf" "eMule" "AcceptExternalConnections" "1"
 
-    # Configurar el WebServer
+    # Configurar el WebServer en el puerto 4711
     update_ini "$amule_conf" "WebServer" "Enabled" "1"
-    update_ini "$amule_conf" "WebServer" "Port" "8090"
+    update_ini "$amule_conf" "WebServer" "Port" "4711"  # Cambiado de 8090 a 4711
     update_ini "$amule_conf" "WebServer" "Password" "$password_web_md5"
 
     # Configurar ExternalConnect
@@ -385,6 +385,16 @@ enable_and_start_services() {
         log "ERROR" "Fallo al iniciar amule-daemon.service. Revisa los logs para más detalles."
         journalctl -u amule-daemon.service --no-pager
         exit 1
+    fi
+
+    # Configurar el firewall para permitir el puerto 4711
+    if command -v ufw &>/dev/null; then
+        log "INFO" "Configurando el firewall para permitir el puerto 4711/tcp..."
+        ufw allow 4711/tcp
+        ufw reload
+        log "INFO" "Puerto 4711/tcp permitido en el firewall."
+    else
+        log "WARNING" "ufw no está instalado. Asegúrate de que el puerto 4711/tcp esté permitido en tu firewall."
     fi
 
     # Si se configuró la GUI, iniciar y verificar
@@ -471,7 +481,7 @@ main() {
     configure_initd_service
 
     # (Opcional) Configurar servicios systemd para la GUI de aMule
-    # Uncomment the following line if deseas configurar la GUI
+    # Uncomment the following line si deseas configurar la GUI
     # configure_services_gui
 
     # Habilitar y arrancar servicios

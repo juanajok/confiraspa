@@ -4,8 +4,8 @@ set -euo pipefail
 # Script Name: confiraspi_v5.sh
 # Description: Script para configurar una Raspberry Pi ejecutando varios scripts en orden de manera idempotente y desatendida.
 # Author: Juan José Hipólito
-# Version: 2.2.0
-# Date: 2024-10-02
+# Version: 2.2.1
+# Date: 2024-10-26
 # License: GNU
 # Usage: Ejecuta este script con sudo: sudo bash confiraspi_v5.sh [DIRECTORIO_DE_SCRIPTS]
 # Dependencies: Verifica e instala automáticamente las dependencias necesarias.
@@ -19,7 +19,7 @@ LOG_FILE="/var/log/confiraspi_v5.log"
 log() {
     local level="$1"
     local message="$2"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" | tee -a "$LOG_FILE"
+    printf "[%s] [%s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$message" | tee -a "$LOG_FILE"
 }
 
 # Función para verificar que los comandos requeridos están disponibles e instalarlos si falta alguno
@@ -88,6 +88,14 @@ run_script() {
     log "INFO" "Script '$script_path' ejecutado correctamente."
 }
 
+# Función para deshabilitar IPv6 temporalmente
+disable_ipv6() {
+    log "INFO" "Deshabilitando IPv6 temporalmente..."
+    sysctl -w net.ipv6.conf.all.disable_ipv6=1 > /dev/null
+    sysctl -w net.ipv6.conf.default.disable_ipv6=1 > /dev/null
+    log "INFO" "IPv6 deshabilitado."
+}
+
 # Función para mostrar el uso del script
 usage() {
     echo "Uso: sudo bash $0 [DIRECTORIO_DE_SCRIPTS]"
@@ -117,6 +125,9 @@ main() {
         log "ERROR" "Este script debe ejecutarse con privilegios de superusuario (sudo)."
         exit 1
     fi
+
+    # Deshabilitar IPv6 antes de cualquier operación de red
+    disable_ipv6
 
     # Verificar que el directorio de scripts existe
     if [ ! -d "$SCRIPTS_DIR" ]; then
@@ -161,4 +172,3 @@ main() {
 
 # Llama a la función principal con todos los argumentos pasados
 main "$@"
-
