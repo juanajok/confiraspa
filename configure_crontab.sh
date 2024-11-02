@@ -27,7 +27,8 @@ echo "$json_data" | jq -c '.[]' | while read -r entry; do
     schedule=$(echo "$entry" | jq -r '.schedule')
     interpreter=$(echo "$entry" | jq -r '.interpreter')
 
-    script_full_path="opt/confiraspa/$script"
+    # Agregar la barra inclinada inicial a la ruta
+    script_full_path="/opt/confiraspa/$script"
 
     # Aplicar permisos ejecutables
     log "Aplicando permisos ejecutables a $script_full_path..."
@@ -55,5 +56,3 @@ echo "$json_data" | jq -c '.[]' | while read -r entry; do
 done
 
 log "Configuración de comandos de crontab completada."
-
-
