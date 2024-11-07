@@ -158,7 +158,6 @@ main() {
     scripts=(
         "update_system.sh"
         "setup_credentials.sh"
-        "create_mount_points.sh"
         "generate_fstab.sh"
         "install_samba.sh"
         "install_xrdp.sh"

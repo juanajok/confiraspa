@@ -1,110 +1,156 @@
 #!/bin/bash
-set -e
 
-# Archivo de log
-LOG_FILE="/var/log/confiraspi_v5.log"
+################################################################################
+# Script Name: manage_mounts.sh
+# Description: Gestiona puntos de montaje basándose en un archivo JSON,
+#              creando directorios de montaje, montando dispositivos y
+#              actualizando /etc/fstab de forma idempotente.
+# Author: Juan José Hipólito
+# Version: 1.1.0
+# Date: 2024-11-07
+# License: GNU GPL v3
+# Usage: Ejecutar con privilegios de superusuario (sudo).
+# Dependencies: blkid, jq, mkdir, mount, grep, awk, sed, flock
+################################################################################
 
-# Función de registro para imprimir mensajes con marca de tiempo
+set -euo pipefail
+
+# Configuración
+CONFIG_FILE="/opt/confiraspa/configs/puntos_de_montaje.json"
+FSTAB_FILE="/etc/fstab"
+LOG_FILE="/var/log/manage_mounts.log"
+
+# Implementar bloqueo para evitar ejecuciones concurrentes
+exec 200>/var/lock/manage_mounts.lock
+flock -n 200 || { echo "Otra instancia del script está en ejecución."; exit 1; }
+
 log() {
     local message="$1"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" | tee -a "$LOG_FILE"
 }
 
-# Verificar si se ejecuta como root
+# Verificar que se ejecuta como root
 if [[ $EUID -ne 0 ]]; then
     log "Este script debe ser ejecutado con privilegios de superusuario (sudo)."
     exit 1
 fi
 
-log "Iniciando la configuración del archivo /etc/fstab..."
+log "Iniciando el script..."
 
-# Crear una copia de seguridad del archivo fstab si no existe
-if [ ! -f /etc/fstab.backup ]; then
-    cp /etc/fstab /etc/fstab.backup
-    log "Copia de seguridad del archivo /etc/fstab creada."
-else
-    log "La copia de seguridad del archivo /etc/fstab ya existe."
-fi
-
-# Crear puntos de montaje
-mkdir -p /media/discoduro /media/Backup /media/WDElements
-log "Directorios de montaje creados."
-
-# Obtener UUIDs de las particiones por etiqueta
-get_uuid_by_label() {
-    local label="$1"
-    blkid -L "$label" 2>/dev/null
-}
-
-# Asignar variables para cada partición
-discoduro_device=$(get_uuid_by_label "DiscoDuro")
-backup_device=$(get_uuid_by_label "Backup")
-wdelements_device=$(get_uuid_by_label "WDElements")
-
-# Agregar mensajes de depuración
-log "DEBUG: discoduro_device = $discoduro_device"
-log "DEBUG: backup_device = $backup_device"
-log "DEBUG: wdelements_device = $wdelements_device"
-
-# Verificar que las particiones existen
-missing_partitions=()
-
-if [ -z "$discoduro_device" ]; then
-    missing_partitions+=("DiscoDuro")
-fi
-if [ -z "$backup_device" ]; then
-    missing_partitions+=("Backup")
-fi
-if [ -z "$wdelements_device" ]; then
-    missing_partitions+=("WDElements")
-fi
-
-if [ ${#missing_partitions[@]} -ne 0 ]; then
-    log "Error: No se pudieron encontrar las siguientes particiones: ${missing_partitions[*]}"
+# Verificar que jq está instalado
+if ! command -v jq >/dev/null 2>&1; then
+    log "'jq' no está instalado. Por favor, instálalo antes de ejecutar este script."
     exit 1
 fi
 
-# Obtener UUIDs
-discoduro_uuid=$(blkid -s UUID -o value "$discoduro_device")
-backup_uuid=$(blkid -s UUID -o value "$backup_device")
-wdelements_uuid=$(blkid -s UUID -o value "$wdelements_device")
-
-# Agregar mensajes de depuración
-log "DEBUG: discoduro_uuid = $discoduro_uuid"
-log "DEBUG: backup_uuid = $backup_uuid"
-log "DEBUG: wdelements_uuid = $wdelements_uuid"
-
-# Obtener sistemas de archivos
-discoduro_fstype=$(blkid -s TYPE -o value "$discoduro_device")
-backup_fstype=$(blkid -s TYPE -o value "$backup_device")
-wdelements_fstype=$(blkid -s TYPE -o value "$wdelements_device")
-
-# Agregar mensajes de depuración
-log "DEBUG: discoduro_fstype = $discoduro_fstype"
-log "DEBUG: backup_fstype = $backup_fstype"
-log "DEBUG: wdelements_fstype = $wdelements_fstype"
-
-# Definir las nuevas entradas para el archivo fstab
-new_entries="UUID=$discoduro_uuid  /media/discoduro        $discoduro_fstype    defaults,nofail        0       0
-UUID=$wdelements_uuid  /media/WDElements       $wdelements_fstype    defaults,nofail        0       0
-UUID=$backup_uuid      /media/Backup           $backup_fstype    defaults,nofail        0       0"
-
-# Añadir las nuevas entradas al archivo fstab si no existen ya
-if ! grep -q "UUID=$discoduro_uuid" /etc/fstab; then
-    echo "$new_entries" >> /etc/fstab
-    log "Nuevas entradas añadidas al archivo /etc/fstab."
-else
-    log "Las entradas ya están presentes en el archivo /etc/fstab."
-fi
-
-# Probar las nuevas monturas
-log "Probando las nuevas entradas en /etc/fstab..."
-if mount -a; then
-    log "Las particiones se montaron correctamente."
-else
-    log "Error: Hubo un problema al montar las particiones. Revirtiendo cambios."
-    cp /etc/fstab.backup /etc/fstab
+# Verificar la existencia del archivo de configuración
+if [ ! -f "$CONFIG_FILE" ]; then
+    log "Archivo de configuración '$CONFIG_FILE' no encontrado."
     exit 1
 fi
 
-log "Configuración del archivo /etc/fstab completada."
+# Verificar la sintaxis y estructura del archivo JSON
+if ! jq -e '.puntos_de_montaje and (.puntos_de_montaje | type == "array")' "$CONFIG_FILE" >/dev/null 2>&1; then
+    log "El archivo JSON '$CONFIG_FILE' no contiene un arreglo 'puntos_de_montaje' válido."
+    exit 1
+fi
+
+# Crear copia de seguridad de /etc/fstab
+cp "$FSTAB_FILE" "${FSTAB_FILE}.bak_$(date +%Y%m%d%H%M%S)"
+log "Copia de seguridad de $FSTAB_FILE creada."
+
+# Procesar cada punto de montaje
+while read -r mount_point; do
+    # Obtener label y ruta
+    label=$(echo "$mount_point" | jq -r '.label')
+    mount_path=$(echo "$mount_point" | jq -r '.ruta')
+
+    # Verificar que label y mount_path no estén vacíos
+    if [ -z "$label" ] || [ -z "$mount_path" ]; then
+        log "Falta 'label' o 'ruta' en la configuración JSON para una entrada."
+        exit 1
+    fi
+
+    log "Procesando dispositivo con label '$label' y ruta de montaje '$mount_path'..."
+
+    # Crear el punto de montaje si no existe
+    if [ ! -d "$mount_path" ]; then
+        mkdir -p "$mount_path"
+        log "Directorio de montaje creado: $mount_path."
+    fi
+
+    # Verificar y corregir permisos y propietarios
+    if [ "$(stat -c '%a' "$mount_path")" != "755" ] || [ "$(stat -c '%U:%G' "$mount_path")" != "root:root" ]; then
+        chmod 755 "$mount_path"
+        chown root:root "$mount_path"
+        log "Permisos y propietarios actualizados para $mount_path."
+    else
+        log "Permisos y propietarios correctos en $mount_path."
+    fi
+
+    # Obtener el dispositivo asociado a la etiqueta
+    devices=( $(blkid -L "$label" 2>/dev/null) )
+    if [ "${#devices[@]}" -gt 1 ]; then
+        log "Se encontraron múltiples dispositivos con la etiqueta '$label'. Por favor, asegúrate de que las etiquetas sean únicas."
+        continue
+    elif [ "${#devices[@]}" -eq 0 ]; then
+        log "No se encontró un dispositivo con la etiqueta '$label'."
+        continue
+    else
+        device="${devices[0]}"
+    fi
+
+    # Obtener UUID y tipo de sistema de archivos
+    uuid=$(blkid -s UUID -o value "$device")
+    fstype=$(blkid -s TYPE -o value "$device")
+
+    # Verificar que se obtuvieron UUID y fstype
+    if [ -z "$uuid" ] || [ -z "$fstype" ]; then
+        log "No se pudo obtener UUID o tipo de sistema de archivos para el dispositivo '$device'."
+        continue
+    fi
+
+    # Opciones de montaje
+    mount_options="defaults,nofail"
+
+    # Añadir opciones específicas según el tipo de sistema de archivos
+    case "$fstype" in
+        ntfs|ntfs-3g)
+            mount_options="$mount_options,uid=1000,gid=1000,dmask=022,fmask=133"
+            ;;
+        vfat)
+            mount_options="$mount_options,uid=1000,gid=1000,umask=022"
+            ;;
+    esac
+
+    # Verificar si la entrada ya existe en /etc/fstab
+    existing_entry=$(grep -E "^[^#]*[[:space:]]+$mount_path[[:space:]]" "$FSTAB_FILE" || true)
+    if [ -n "$existing_entry" ]; then
+        if echo "$existing_entry" | grep -q "UUID=$uuid"; then
+            log "La entrada para $mount_path ya existe en $FSTAB_FILE con UUID correcto."
+        else
+            # Actualizar la entrada existente
+            sed -i.bak "/^[^#]*[[:space:]]\+$mount_path[[:space:]]/c\UUID=$uuid $mount_path $fstype $mount_options 0 0" "$FSTAB_FILE"
+            log "Entrada actualizada en $FSTAB_FILE para $mount_path."
+        fi
+    else
+        # Añadir nueva entrada
+        echo "UUID=$uuid $mount_path $fstype $mount_options 0 0" >> "$FSTAB_FILE"
+        log "Entrada añadida a $FSTAB_FILE para $mount_path."
+    fi
+
+    # Verificar si el dispositivo ya está montado
+    if mountpoint -q "$mount_path"; then
+        log "El dispositivo ya está montado en $mount_path."
+    else
+        # Intentar montar el dispositivo
+        if mount "$mount_path"; then
+            log "Dispositivo montado en $mount_path exitosamente."
+        else
+            log "Error al montar $mount_path."
+            continue
+        fi
+    fi
+done < <(jq -c '.puntos_de_montaje[]' "$CONFIG_FILE")
+
+log "Proceso completado."

@@ -1,8 +1,16 @@
 {
   "puntos_de_montaje": [
-    "/media/DiscoDuro",
-    "/media/Backup",
-    "/media/WDElements"
+      {
+          "label": "DiscoDuro",
+          "ruta": "/media/DiscoDuro"
+      },
+      {
+          "label": "Backup",
+          "ruta": "/media/Backup"
+      },
+      {
+          "label": "WDElements",
+          "ruta": "/media/WDElements"
+      }
   ]
 }
-  

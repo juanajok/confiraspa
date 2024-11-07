@@ -2,15 +2,19 @@
   "directorios": [
     {
       "origen": "/media/WDElements/Fotos",
-      "destino": "/media/Backup"
+      "destino": "/media/Backup/Fotos"
+    },
+    {
+      "origen": "/media/WDElements/Docus",
+      "destino": "/media/Backup/Docus"
     },
     {
       "origen": "/media/WDElements/Libros/Biblioteca de Calibre",
-      "destino": "/media/Backup"
+      "destino": "/media/Backup/Libros/"
     },
     {
       "origen": "/media/WDElements/Tebeos",
-      "destino": "/media/Backup"
+      "destino": "/media/BackupTebeos"
     },
   
     {
