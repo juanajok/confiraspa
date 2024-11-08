@@ -4,8 +4,8 @@ set -euo pipefail
 # Script Name: backup_rsync.sh
 # Description: Script para realizar copias de seguridad usando rsync
 # Author: Juan José Hipólito
-# Version: 1.3.0
-# Date: 2023-08-03
+# Version: 1.6.0
+# Date: 2024-11-08
 # License: GNU
 # Usage: Ejecuta el script manualmente o programa su ejecución en crontab
 # Dependencies: rsync y jq
@@ -13,7 +13,7 @@ set -euo pipefail
 
 # Variables
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/configs/backup_rsync_config.json"
+CONFIG_FILE="/opt/confiraspa/configs/backup_rsync_config.json"  # Asegúrate de que esta ruta es correcta
 LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/backup_rsync_$(date +'%Y-%m-%d_%H-%M-%S').log"
 
@@ -54,19 +54,33 @@ if ! jq empty "$CONFIG_FILE" >/dev/null 2>&1; then
     exit 1
 fi
 
-# Leer el archivo JSON con las rutas de las carpetas y ejecutar rsync para cada par de directorios origen y destino
-while read -r dir_info; do
-    origen=$(jq -r '.origen' <<< "$dir_info")
-    destino=$(jq -r '.destino' <<< "$dir_info")
+# Agregar mensaje de depuración para la ruta del archivo JSON
+#log_message "DEBUG" "Archivo de configuración: '$CONFIG_FILE'"
 
-    # Verificar que los directorios de origen y destino existen
-    if [ ! -d "$origen" ]; then
-        log_message "ERROR" "El directorio de origen '$origen' no existe. Saltando..."
+# Procesar cada entrada en el array 'directorios' en el archivo de configuración JSON
+jq -c '.directorios[]' "$CONFIG_FILE" | while read -r entry; do
+    # Imprimir la entrada JSON para depuración
+    #log_message "DEBUG" "Entrada JSON: '$entry'"
+
+    # Extraer los datos del JSON
+    origen=$(jq -r '.origen' <<< "$entry")
+    destino=$(jq -r '.destino' <<< "$entry")
+
+    log_message "INFO" "Procesando backup. Origen='$origen', Destino='$destino'"
+
+    # Determinar si 'origen' es un archivo o directorio
+    if [ -d "$origen" ]; then
+        tipo="directorio"
+    elif [ -f "$origen" ]; then
+        tipo="archivo"
+    else
+        log_message "ERROR" "El origen '$origen' no existe. Saltando..."
         continue
     fi
 
+    # Crear el directorio de destino si no existe
     if [ ! -d "$destino" ]; then
-        log_message "ERROR" "El directorio de destino '$destino' no existe. Creando..."
+        log_message "INFO" "El directorio de destino '$destino' no existe. Creando..."
         mkdir -p "$destino"
         if [ $? -ne 0 ]; then
             log_message "ERROR" "No se pudo crear el directorio de destino '$destino'. Saltando..."
@@ -74,17 +88,23 @@ while read -r dir_info; do
         fi
     fi
 
-    log_message "INFO" "Sincronizando origen: '$origen' con destino: '$destino'..."
-
-    # Ejecutar rsync
+    # Ejecutar rsync dependiendo del tipo
+    log_message "INFO" "Sincronizando '$origen' con '$destino' como $tipo..."
     rsync_options="-avh --delete --stats"
-    if rsync $rsync_options "$origen"/ "$destino"/ >> "$LOG_FILE" 2>&1; then
-        log_message "INFO" "Sincronización completada para origen: '$origen' con destino: '$destino'."
-    else
-        log_message "ERROR" "Error al sincronizar origen: '$origen' con destino: '$destino'."
+
+    if [ "$tipo" == "directorio" ]; then
+        rsync $rsync_options "$origen"/ "$destino"/ >> "$LOG_FILE" 2>&1
+    elif [ "$tipo" == "archivo" ]; then
+        rsync $rsync_options "$origen" "$destino"/ >> "$LOG_FILE" 2>&1
     fi
 
-done < <(jq -c '.directorios[]' "$CONFIG_FILE")
+    # Verificar si rsync tuvo éxito
+    if [ $? -eq 0 ]; then
+        log_message "INFO" "Sincronización completada para '$origen' con '$destino'."
+    else
+        log_message "ERROR" "Error al sincronizar '$origen' con '$destino'."
+    fi
+
+done
 
 log_message "INFO" "Proceso de copia de seguridad con rsync finalizado."
-

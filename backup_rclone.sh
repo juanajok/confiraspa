@@ -1,87 +1,65 @@
 #!/bin/bash
 set -euo pipefail
+IFS=$'\n\t'
 
-# Script Name: backup_rclone.sh
-# Description: Script para realizar copias de seguridad en la nube usando rclone
+# Script Name: backup_rclone_simple.sh
+# Description: Realiza copias de seguridad utilizando rclone para múltiples directorios.
 # Author: Juan José Hipólito
-# Version: 1.3.0
-# Date: 2023-08-03
-# License: GNU
-# Usage: Ejecuta el script manualmente o programa su ejecución en crontab
-# Dependencies: rclone y jq
-# Notes: Asegúrate de que las rutas de origen y destino estén montadas antes de ejecutar este script
+# Version: 0.2
+# Date: 2024-11-08
+# License: MIT License
+# Usage: Ejecuta el script manualmente.
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/configs/backup_rclone_config.json"
-LOG_DIR="$SCRIPT_DIR/logs"
-LOG_FILE="$LOG_DIR/backup_rclone_$(date +'%Y-%m-%d_%H-%M-%S').log"
-RCLONE_CONFIG="/home/pi/.config/rclone/rclone.conf"  # Ruta al archivo de configuración de rclone
+LOG_DIR="/opt/confiraspa/logs"
+LOG_FILE="$LOG_DIR/backup_rclone_simple_$(date +'%Y-%m-%d_%H-%M-%S').log"
+RCLONE_CONFIG="/home/pi/.config/rclone/rclone.conf"
+CONFIG_FILE="/opt/confiraspa/configs/backup_rclone_config.json"
 
 # Crear directorio de logs si no existe
 mkdir -p "$LOG_DIR"
 
-# Funciones
+# Función para loguear mensajes
 log_message() {
     local level="$1"
     local message="$2"
     echo "$(date +'%Y-%m-%d %H:%M:%S') - [$level] - $message" | tee -a "$LOG_FILE"
 }
 
-# Verificar que rclone está instalado
-if ! command -v rclone >/dev/null 2>&1; then
-    log_message "ERROR" "'rclone' no está instalado. Por favor, instálalo antes de ejecutar este script."
-    exit 1
-fi
-
-# Verificar que jq está instalado
-if ! command -v jq >/dev/null 2>&1; then
-    log_message "ERROR" "'jq' no está instalado. Por favor, instálalo antes de ejecutar este script."
-    exit 1
-fi
-
-# Verificar la existencia del archivo de configuración de rclone
-if [ ! -f "$RCLONE_CONFIG" ]; then
-    log_message "ERROR" "El archivo de configuración de rclone '$RCLONE_CONFIG' no existe."
-    exit 1
-fi
-
-# Comenzar
+# Iniciar el proceso
 log_message "INFO" "Iniciando el proceso de copia de seguridad con rclone..."
 
-# Verificar la existencia del archivo de configuración
-if [ ! -f "$CONFIG_FILE" ]; then
-    log_message "ERROR" "Archivo de configuración '$CONFIG_FILE' no encontrado."
+# Leer todas las tareas en un array
+mapfile -t tasks < <(jq -c '.directorios[]' "$CONFIG_FILE")
+
+# Verificar que hay tareas
+if [ "${#tasks[@]}" -eq 0 ]; then
+    log_message "ERROR" "No hay tareas definidas en el archivo de configuración."
     exit 1
 fi
 
-# Validar el archivo JSON
-if ! jq empty "$CONFIG_FILE" >/dev/null 2>&1; then
-    log_message "ERROR" "El archivo de configuración '$CONFIG_FILE' no es un JSON válido."
-    exit 1
-fi
+# Iterar sobre cada tarea
+for task in "${tasks[@]}"; do
+    origen=$(echo "$task" | jq -r '.origen')
+    destino=$(echo "$task" | jq -r '.destino')
 
-# Leer el archivo JSON con las rutas de las carpetas y ejecutar rclone para cada par de directorios origen y destino
-while read -r dir_info; do
-    origen=$(echo "$dir_info" | jq -r '.origen')
-    destino=$(echo "$dir_info" | jq -r '.destino')
-
-    # Verificar que el directorio de origen existe
-    if [ ! -d "$origen" ]; then
-        log_message "ERROR" "El directorio de origen '$origen' no existe. Saltando..."
+    # Validar que 'origen' y 'destino' no estén vacíos
+    if [ -z "$origen" ] || [ -z "$destino" ]; then
+        log_message "ERROR" "La entrada en el archivo de configuración no tiene 'origen' o 'destino'. Saltando..."
         continue
     fi
 
-    log_message "INFO" "Sincronizando origen: '$origen' con destino: '$destino'..."
+    log_message "INFO" "Sincronizando desde '$origen' hacia '$destino'..."
+    log_message "DEBUG" "Ejecutando: rclone sync '$origen' '$destino' --config='$RCLONE_CONFIG' --verbose"
 
-    # Ejecutar rclone
-    rclone_options="--config=\"$RCLONE_CONFIG\" --verbose"
-    if rclone sync "$origen" "$destino" $rclone_options >> "$LOG_FILE" 2>&1; then
-        log_message "INFO" "Sincronización completada para origen: '$origen' con destino: '$destino'."
+    # Ejecutar rclone sync y capturar el estado de salida
+    if rclone sync "$origen" "$destino" --config="$RCLONE_CONFIG" --verbose >> "$LOG_FILE" 2>&1; then
+        log_message "INFO" "Sincronización completada para '$origen' hacia '$destino'."
     else
-        log_message "ERROR" "Error al sincronizar origen: '$origen' con destino: '$destino'."
+        log_message "ERROR" "Error al sincronizar '$origen' hacia '$destino'."
     fi
+done
 
-done < <(jq -c '.directorios[]' "$CONFIG_FILE")
-
+# Fin del proceso
 log_message "INFO" "Proceso de copia de seguridad con rclone finalizado."
+
