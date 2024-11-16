@@ -5,7 +5,7 @@ IFS=$'\n\t'
 # Script Name: backup_rclone_simple.sh
 # Description: Realiza copias de seguridad utilizando rclone para múltiples directorios.
 # Author: Juan José Hipólito
-# Version: 0.2
+# Version: 0.3
 # Date: 2024-11-08
 # License: MIT License
 # Usage: Ejecuta el script manualmente.
@@ -26,8 +26,32 @@ log_message() {
     echo "$(date +'%Y-%m-%d %H:%M:%S') - [$level] - $message" | tee -a "$LOG_FILE"
 }
 
+# Verificar que rclone está instalado
+if ! command -v rclone >/dev/null 2>&1; then
+    log_message "ERROR" "'rclone' no está instalado. Por favor, instálalo antes de ejecutar este script."
+    exit 1
+fi
+
+# Verificar que jq está instalado
+if ! command -v jq >/dev/null 2>&1; then
+    log_message "ERROR" "'jq' no está instalado. Por favor, instálalo antes de ejecutar este script."
+    exit 1
+fi
+
 # Iniciar el proceso
 log_message "INFO" "Iniciando el proceso de copia de seguridad con rclone..."
+
+# Verificar la existencia del archivo de configuración
+if [ ! -f "$CONFIG_FILE" ]; then
+    log_message "ERROR" "Archivo de configuración no encontrado en '$CONFIG_FILE'."
+    exit 1
+fi
+
+# Validar el archivo JSON
+if ! jq empty "$CONFIG_FILE" >/dev/null 2>&1; then
+    log_message "ERROR" "El archivo de configuración '$CONFIG_FILE' no es un JSON válido."
+    exit 1
+fi
 
 # Leer todas las tareas en un array
 mapfile -t tasks < <(jq -c '.directorios[]' "$CONFIG_FILE")
@@ -40,6 +64,7 @@ fi
 
 # Iterar sobre cada tarea
 for task in "${tasks[@]}"; do
+    # Extraer 'origen' y 'destino' usando el método original
     origen=$(echo "$task" | jq -r '.origen')
     destino=$(echo "$task" | jq -r '.destino')
 
@@ -50,16 +75,29 @@ for task in "${tasks[@]}"; do
     fi
 
     log_message "INFO" "Sincronizando desde '$origen' hacia '$destino'..."
-    log_message "DEBUG" "Ejecutando: rclone sync '$origen' '$destino' --config='$RCLONE_CONFIG' --verbose"
 
-    # Ejecutar rclone sync y capturar el estado de salida
-    if rclone sync "$origen" "$destino" --config="$RCLONE_CONFIG" --verbose >> "$LOG_FILE" 2>&1; then
+    # Ejecutar rclone sync con reintentos
+    max_retries=3
+    retry_count=0
+    success=false
+
+    while [ $retry_count -lt $max_retries ]; do
+        if rclone sync "$origen" "$destino" --config="$RCLONE_CONFIG" --verbose >> "$LOG_FILE" 2>&1; then
+            success=true
+            break
+        else
+            log_message "WARN" "Error al sincronizar '$origen' hacia '$destino'. Reintentando ($((retry_count+1))/$max_retries)..."
+            retry_count=$((retry_count+1))
+            sleep 5  # Espera 5 segundos antes del siguiente intento
+        fi
+    done
+
+    if [ "$success" = true ]; then
         log_message "INFO" "Sincronización completada para '$origen' hacia '$destino'."
     else
-        log_message "ERROR" "Error al sincronizar '$origen' hacia '$destino'."
+        log_message "ERROR" "Sincronización fallida para '$origen' hacia '$destino' después de $max_retries intentos."
     fi
 done
 
 # Fin del proceso
 log_message "INFO" "Proceso de copia de seguridad con rclone finalizado."
-

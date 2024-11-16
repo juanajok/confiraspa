@@ -31,7 +31,7 @@ logging.basicConfig(
     level=logging.INFO,
     handlers=[
         logging.StreamHandler(),  # Muestra los mensajes en la consola
-        logging.FileHandler('downloadclean.py')  # Guarda los mensajes en un archivo de log
+        logging.FileHandler('limpieza_descargas.log')  # Guarda los mensajes en un archivo de log
     ]
 )
 
@@ -96,7 +96,7 @@ def clean_empty_directories(root_dir):
 
 def main():
     # Cargar directorios desde el archivo JSON
-    config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs", "directories.json")
+    config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "directories.json")
     try:
         with open(config_file, 'r') as f:
             config = json.load(f)
@@ -150,3 +150,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

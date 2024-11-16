@@ -1,9 +1,15 @@
 {
-  "usuario": "nombre_usuario",
+  "usuario": "pi",
   "permisos": "777",
   "directorios": [
-      "/ruta/al/directorio1",
-      "/ruta/al/directorio con espacios",
-      "/otra/ruta/directorio2"
+      "/media/WDElements/Música",
+      "/media/WDElements/Fotos",
+      "/media/WDElements/Peliculas",
+      "/media/WDElements/Series TV",
+      "/media/WDElements/Tebeos",
+      "/media/WDElements/Docus",
+      "/media/WDElements/Rol",
+      "/media/WDElements/Libros",
+      "/media/DiscoDuro/torrents/completos"
   ]
 }

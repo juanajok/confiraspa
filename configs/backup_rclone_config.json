@@ -7,6 +7,7 @@
     {"origen": "GDriveJuanjo:Backup Papa", "destino": "/media/Backup/Juanjo/Papa"},
     {"origen": "GDriveJuanjo:docu para el coche", "destino": "/media/Backup/Juanjo/Coche"},
     {"origen": "GDriveJuanjo:Documentos comunes", "destino": "/media/Backup/Documentos"},
-    {"origen": "GDriveJuanjo:Diego", "destino": "/media/Backup/Diego"}
+    {"origen": "GDriveJuanjo:Diego", "destino": "/media/Backup/Diego"},
+    {"origen": "GPhotosJuanjo:", "destino": "/media/Backup/FotosGooglePhotos"}
   ]
 }

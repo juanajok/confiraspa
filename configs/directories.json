@@ -2,5 +2,7 @@
     "download_dir": "/media/DiscoDuro/torrents/completos",
     "series_dir": "/media/WDElements/Series TV",
     "movies_dir": "/media/WDElements/Peliculas",
-    "music_dir": "/media/WDElements/Música"
+    "music_dir": "/media/WDElements/Música",
+    "comics_dir": "/media/WDElements/Tebeos"
 }
+

@@ -1,12 +1,11 @@
-
 #!/bin/bash
 set -euo pipefail
 
 # Script Name: change_permissions.sh
 # Description: Cambia la propiedad y los permisos de los directorios especificados en un archivo JSON.
 # Author: Juan José Hipólito
-# Version: 1.2.0
-# Date: 2024-11-08
+# Version: 1.1.0
+# Date: 17/04/2023
 # License: GNU
 # Usage: Ejecuta el script manualmente
 # Dependencies: jq
@@ -48,10 +47,8 @@ fi
 
 # Leer la información del archivo JSON
 usuario=$(jq -r '.usuario' "$CONFIG_FILE")
+directorios=($(jq -r '.directorios[]' "$CONFIG_FILE"))
 permisos=$(jq -r '.permisos' "$CONFIG_FILE")
-
-# Leer los directorios en un array, preservando espacios
-readarray -t directorios < <(jq -r '.directorios[]' "$CONFIG_FILE")
 
 # Validar que los valores no están vacíos
 if [ -z "$usuario" ]; then
@@ -65,7 +62,7 @@ if [ ${#directorios[@]} -eq 0 ]; then
 fi
 
 if [ -z "$permisos" ]; then
-    permisos="755" # Valor por defecto
+    permisos="755"  # Valor por defecto
     log_message "INFO" "No se especificaron permisos en el archivo de configuración. Se utilizará el valor por defecto: $permisos"
 fi
 
