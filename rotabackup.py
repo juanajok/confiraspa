@@ -34,7 +34,7 @@ from pathlib import Path
 from datetime import datetime
 
 # Configuración del logger
-LOG_FILE = 'backup_cleanup.log'
+LOG_FILE = 'brotabackup.log'
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] [%(filename)s]: %(message)s',
@@ -79,7 +79,7 @@ def remove_old_backups(folder, latest_backups):
 
 def main():
     # Ruta al archivo de configuración
-    CONFIG_DIR = "/configs"
+    CONFIG_DIR = "/opt/confiraspa/configs"
     CONFIG_FILE = os.path.join(CONFIG_DIR, "app_backup_paths.json")
 
     app_paths = read_app_paths(CONFIG_FILE)
