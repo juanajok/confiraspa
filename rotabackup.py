@@ -34,7 +34,7 @@ from pathlib import Path
 from datetime import datetime
 
 # Configuración del logger
-LOG_FILE = 'brotabackup.log'
+LOG_FILE = 'rotabackup.log'
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] [%(filename)s]: %(message)s',
