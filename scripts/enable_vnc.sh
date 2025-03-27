@@ -17,13 +17,11 @@
 #   - sed: Para modificar líneas específicas en el archivo de configuración.
 # Important: Este script debe ser ejecutado con privilegios de superusuario (sudo).
 
-set -euo pipefail
+# --- Cargar Funciones Comunes ---
+source /opt/confiraspa/lib/utils.sh
 
-# Función de registro para imprimir mensajes con marca de tiempo
-log() {
-    local message="$1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(basename "$0")] $message"
-}
+check_root
+setup_error_handling
 
 log "11) Habilitando VNC..."
 

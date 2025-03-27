@@ -9,8 +9,14 @@ set -euo pipefail
 # License: GNU
 # Usage: Ejecutar este script como superusuario (sudo).
 
-# Archivo de log (usamos el mismo que el script principal)
-LOG_FILE="/var/log/confiraspi_v5.log"
+# --- Cargar Funciones Comunes ---
+source /opt/confiraspa/lib/utils.sh
+
+# --- Inicialización ---
+check_root                # Verificar ejecución como root
+setup_error_handling      # Habilitar captura de errores
+install_dependencies "wget" "jq"  # Instalar dependencias del sistema
+
 
 # Función de registro para imprimir mensajes con marca de tiempo y nivel de log
 log() {

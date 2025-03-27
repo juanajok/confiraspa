@@ -13,90 +13,31 @@ set -euo pipefail
 # Variables Globales
 #######################################
 
+source /opt/confiraspa/lib/utils.sh
+
+# --- Validaciones Iniciales ---
+check_root
+setup_error_handling
+setup_paths
+install_dependencies "samba" "samba-common-bin"
+
+
 usuario="amule"  # Cambia esto si usas otro usuario
 user_home="/home/$usuario"
-script_path="/opt/confiraspa"
-creds_json="$script_path/configs/credenciales.json"
-dirs_json="$script_path/configs/amule_directories.json"
+creds_json="${CONFIG_DIR}/credenciales.json"
+dirs_json="${CONFIG_DIR}/amule_directories.json"
 
-#######################################
-# Función para registrar mensajes con marca de tiempo y nivel de log
-# Argumentos:
-#   $1 - Nivel de log (INFO, ERROR, etc.)
-#   $2 - Mensaje
-#######################################
-log() {
-    local level="$1"
-    local message="$2"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message"
-}
-
-#######################################
-# Función para verificar si se está ejecutando como root
-#######################################
-check_root() {
-    if [[ "$EUID" -ne 0 ]]; then
-        log "ERROR" "Este script debe ser ejecutado como root. Usa sudo."
-        exit 1
-    fi
-}
 
 #######################################
 # Función para verificar conectividad a Internet
 #######################################
 check_internet() {
     log "INFO" "Verificando conectividad a Internet..."
-    if curl -s --head http://www.google.com/ | grep "200 OK" > /dev/null; then
-        log "INFO" "Conectividad a Internet verificada."
-    else
+    if ! curl -Is http://www.google.com | grep -q "HTTP/[0-9.]\+ 200"; then
         log "ERROR" "No hay conexión a Internet. Verifica tu conexión y vuelve a intentarlo."
-        exit 1
-    fi
-}
-
-#######################################
-# Función para instalar un paquete si no está instalado
-# Argumentos:
-#   $1 - Nombre del paquete
-#######################################
-install_package_if_needed() {
-    local package="$1"
-    if ! dpkg -l | grep -qw "$package"; then
-        log "INFO" "Instalando paquete '$package'..."
-        if apt-get install -y "$package"; then
-            log "INFO" "Paquete '$package' instalado correctamente."
-        else
-            log "ERROR" "Fallo en la instalación del paquete '$package'. Verifica tu conexión a Internet o las fuentes de paquetes."
-            exit 1
-        fi
     else
-        log "INFO" "El paquete '$package' ya está instalado."
-    fi
-}
-
-#######################################
-# Función para instalar dependencias y aMule
-#######################################
-install_amule() {
-    log "INFO" "Instalando aMule y sus dependencias..."
-
-    # Actualizar lista de paquetes
-    if apt-get update; then
-        log "INFO" "Lista de paquetes actualizada correctamente."
-    else
-        log "ERROR" "Fallo al actualizar la lista de paquetes. Verifica tu conexión a Internet."
-        exit 1
-    fi
-
-    # Instalar paquetes necesarios
-    install_package_if_needed "amule"
-    install_package_if_needed "amule-utils"
-    install_package_if_needed "amule-daemon"
-    install_package_if_needed "amule-utils-gui"
-    install_package_if_needed "jq"
-    install_package_if_needed "curl"
-
-    log "INFO" "aMule y sus dependencias instaladas correctamente."
+        log "INFO" "Conectividad a Internet verificada."
+   fi
 }
 
 #######################################
@@ -249,9 +190,9 @@ configure_amule() {
     # Ejecutar amuled para generar el archivo de configuración si no existe
     if [[ ! -f "$amule_conf" ]]; then
         log "INFO" "Generando archivos de configuración de aMule..."
-        sudo -u "$usuario" amuled --ec-config --config-dir="$user_home/.aMule" &
+        timeout 10s-u "$usuario" amuled --ec-config --config-dir="$user_home/.aMule" &
         local amuled_pid=$!
-        sleep 5
+        
 
         # Detener amuled de forma segura
         if [[ -f "$pid_file" ]]; then
@@ -422,9 +363,14 @@ main() {
 
     # Verificar si se ejecuta como root
     check_root
+    setup_error_handling
+    setup_paths
 
     # Verificar conectividad a Internet
-    check_internet
+    check_internet 
+
+    # instalar dependencias
+    install_dependencies "jq" "curl"
 
     # Verificar que los archivos JSON existen
     if [[ ! -f "$creds_json" ]]; then
@@ -466,7 +412,7 @@ main() {
     temp_directory=$(jq -r '.temp_directory' "$dirs_json")
 
     # Instalar aMule y dependencias
-    install_amule
+    install_dependencies "amule" "amule-utils" "amule-daemon" "amule-utils-gui"
 
     # Configurar /etc/default/amule-daemon
     configure_amule_daemon_defaults

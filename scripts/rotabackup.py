@@ -33,6 +33,9 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
+INSTALL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_DIR = os.path.join(INSTALL_DIR, "configs")
+
 # Configuración del logger
 LOG_FILE = 'rotabackup.log'
 logging.basicConfig(
@@ -79,7 +82,6 @@ def remove_old_backups(folder, latest_backups):
 
 def main():
     # Ruta al archivo de configuración
-    CONFIG_DIR = "/opt/confiraspa/configs"
     CONFIG_FILE = os.path.join(CONFIG_DIR, "app_backup_paths.json")
 
     app_paths = read_app_paths(CONFIG_FILE)

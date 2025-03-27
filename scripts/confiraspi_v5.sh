@@ -11,65 +11,15 @@ set -euo pipefail
 # Dependencies: Verifica e instala automáticamente las dependencias necesarias.
 # Notes: Este script configura una Raspberry Pi con varios servicios y programas de manera segura y automatizada.
 
+# --- Cargar Funciones Comunes ---
+source /opt/confiraspa/lib/utils.sh
+
+check_root
+setup_error_handling
+install_dependencies "chmod" "jq" "bash" "apt-get" "sudo" # depenencias
+
 # Variables
-DEFAULT_SCRIPTS_DIR="/opt/confiraspa"
-LOG_DIR="/var/log/confiraspi_v5"
-MAIN_LOG_FILE="$LOG_DIR/main.log"
-
-# Crear el directorio de logs si no existe
-mkdir -p "$LOG_DIR"
-chmod 755 "$LOG_DIR"
-
-# Función de registro para imprimir mensajes con marca de tiempo y nivel de log en el log principal
-log() {
-    local level="$1"
-    local message="$2"
-    # Escribir al archivo de log principal
-    printf "[%s] [%s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$message" >> "$MAIN_LOG_FILE"
-    # Imprimir en la consola
-    printf "[%s] [%s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$message"
-}
-
-# Función para verificar que los comandos requeridos están disponibles e instalarlos si falta alguno
-check_and_install_dependencies() {
-    local required_commands=(
-        "chmod" 
-        "bash" 
-        "jq"
-        "apt-get"
-        "sudo"
-    )
-    local missing_commands=()
-
-    for cmd in "${required_commands[@]}"; do
-        if ! command -v "$cmd" &> /dev/null; then
-            missing_commands+=("$cmd")
-        fi
-    done
-
-    if [ ${#missing_commands[@]} -ne 0 ]; then
-        log "INFO" "Instalando dependencias faltantes: ${missing_commands[*]}"
-        apt-get update -y
-
-        for cmd in "${missing_commands[@]}"; do
-            case "$cmd" in
-                "jq")
-                    apt-get install -y jq
-                    ;;
-                "chmod"|"bash"|"sudo"|"apt-get")
-                    # Estas herramientas deberían estar presentes en casi todas las distribuciones de Linux.
-                    log "ERROR" "El comando '$cmd' es esencial pero no está instalado. Por favor, instálalo manualmente."
-                    exit 1
-                    ;;
-                *)
-                    log "WARNING" "Comando desconocido '$cmd' necesita instalación."
-                    ;;
-            esac
-        done
-    else
-        log "INFO" "Todas las dependencias necesarias están instaladas."
-    fi
-}
+DEFAULT_SCRIPTS_DIR="/opt/confiraspa/scripts"
 
 # Función para verificar la existencia y permisos de un script antes de ejecutarlo
 check_script() {
@@ -150,9 +100,6 @@ main() {
         log "ERROR" "El directorio de scripts '$SCRIPTS_DIR' no existe."
         exit 1
     fi
-
-    # Verifica que todas las dependencias estén disponibles o las instala
-    check_and_install_dependencies
 
     # Lista de scripts a ejecutar en orden
     scripts=(

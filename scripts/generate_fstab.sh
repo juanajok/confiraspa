@@ -13,51 +13,40 @@
 # Dependencies: blkid, jq, mkdir, mount, grep, awk, sed, flock
 ################################################################################
 
-set -euo pipefail
+source /opt/confiraspa/lib/utils.sh
+
+check_root
+setup_error_handling
+setup_paths
+install_dependencies "jq"  # dependencias
+
 
 # Configuración
-CONFIG_FILE="/opt/confiraspa/configs/puntos_de_montaje.json"
+CONFIG_FILE="$CONFIG_DIR/puntos_de_montaje.json"
 FSTAB_FILE="/etc/fstab"
-LOG_FILE="/var/log/manage_mounts.log"
 
 # Implementar bloqueo para evitar ejecuciones concurrentes
 exec 200>/var/lock/manage_mounts.lock
 flock -n 200 || { echo "Otra instancia del script está en ejecución."; exit 1; }
 
-log() {
-    local message="$1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" | tee -a "$LOG_FILE"
-}
 
-# Verificar que se ejecuta como root
-if [[ $EUID -ne 0 ]]; then
-    log "Este script debe ser ejecutado con privilegios de superusuario (sudo)."
-    exit 1
-fi
-
-log "Iniciando el script..."
-
-# Verificar que jq está instalado
-if ! command -v jq >/dev/null 2>&1; then
-    log "'jq' no está instalado. Por favor, instálalo antes de ejecutar este script."
-    exit 1
-fi
+log "INFO" "Iniciando el script..."
 
 # Verificar la existencia del archivo de configuración
 if [ ! -f "$CONFIG_FILE" ]; then
-    log "Archivo de configuración '$CONFIG_FILE' no encontrado."
+    log "ERROR" "Archivo de configuración '$CONFIG_FILE' no encontrado."
     exit 1
 fi
 
 # Verificar la sintaxis y estructura del archivo JSON
 if ! jq -e '.puntos_de_montaje and (.puntos_de_montaje | type == "array")' "$CONFIG_FILE" >/dev/null 2>&1; then
-    log "El archivo JSON '$CONFIG_FILE' no contiene un arreglo 'puntos_de_montaje' válido."
+    log "ERROR" "El archivo JSON '$CONFIG_FILE' no contiene un arreglo 'puntos_de_montaje' válido."
     exit 1
 fi
 
 # Crear copia de seguridad de /etc/fstab
 cp "$FSTAB_FILE" "${FSTAB_FILE}.bak_$(date +%Y%m%d%H%M%S)"
-log "Copia de seguridad de $FSTAB_FILE creada."
+log "INFO" "Copia de seguridad de $FSTAB_FILE creada."
 
 # Procesar cada punto de montaje
 while read -r mount_point; do
@@ -71,30 +60,30 @@ while read -r mount_point; do
         exit 1
     fi
 
-    log "Procesando dispositivo con label '$label' y ruta de montaje '$mount_path'..."
+    log "INFO" "Procesando dispositivo con label '$label' y ruta de montaje '$mount_path'..."
 
     # Crear el punto de montaje si no existe
     if [ ! -d "$mount_path" ]; then
         mkdir -p "$mount_path"
-        log "Directorio de montaje creado: $mount_path."
+        log "INFO" "Directorio de montaje creado: $mount_path."
     fi
 
     # Verificar y corregir permisos y propietarios
     if [ "$(stat -c '%a' "$mount_path")" != "755" ] || [ "$(stat -c '%U:%G' "$mount_path")" != "root:root" ]; then
         chmod 755 "$mount_path"
         chown root:root "$mount_path"
-        log "Permisos y propietarios actualizados para $mount_path."
+        log "INFO" "Permisos y propietarios actualizados para $mount_path."
     else
-        log "Permisos y propietarios correctos en $mount_path."
+        log "INFO" "Permisos y propietarios correctos en $mount_path."
     fi
 
     # Obtener el dispositivo asociado a la etiqueta
     devices=( $(blkid -L "$label" 2>/dev/null) )
     if [ "${#devices[@]}" -gt 1 ]; then
-        log "Se encontraron múltiples dispositivos con la etiqueta '$label'. Por favor, asegúrate de que las etiquetas sean únicas."
+        log "ERROR" "Se encontraron múltiples dispositivos con la etiqueta '$label'. Por favor, asegúrate de que las etiquetas sean únicas."
         continue
     elif [ "${#devices[@]}" -eq 0 ]; then
-        log "No se encontró un dispositivo con la etiqueta '$label'."
+        log "ERROR" "No se encontró un dispositivo con la etiqueta '$label'."
         continue
     else
         device="${devices[0]}"
@@ -106,7 +95,7 @@ while read -r mount_point; do
 
     # Verificar que se obtuvieron UUID y fstype
     if [ -z "$uuid" ] || [ -z "$fstype" ]; then
-        log "No se pudo obtener UUID o tipo de sistema de archivos para el dispositivo '$device'."
+        log "ERROR" "No se pudo obtener UUID o tipo de sistema de archivos para el dispositivo '$device'."
         continue
     fi
 
@@ -127,30 +116,30 @@ while read -r mount_point; do
     existing_entry=$(grep -E "^[^#]*[[:space:]]+$mount_path[[:space:]]" "$FSTAB_FILE" || true)
     if [ -n "$existing_entry" ]; then
         if echo "$existing_entry" | grep -q "UUID=$uuid"; then
-            log "La entrada para $mount_path ya existe en $FSTAB_FILE con UUID correcto."
+            log "ERROR" "La entrada para $mount_path ya existe en $FSTAB_FILE con UUID correcto."
         else
             # Actualizar la entrada existente
             sed -i.bak "/^[^#]*[[:space:]]\+$mount_path[[:space:]]/c\UUID=$uuid $mount_path $fstype $mount_options 0 0" "$FSTAB_FILE"
-            log "Entrada actualizada en $FSTAB_FILE para $mount_path."
+            log "INFO" "Entrada actualizada en $FSTAB_FILE para $mount_path."
         fi
     else
         # Añadir nueva entrada
         echo "UUID=$uuid $mount_path $fstype $mount_options 0 0" >> "$FSTAB_FILE"
-        log "Entrada añadida a $FSTAB_FILE para $mount_path."
+        log "INFO" "Entrada añadida a $FSTAB_FILE para $mount_path."
     fi
 
     # Verificar si el dispositivo ya está montado
     if mountpoint -q "$mount_path"; then
-        log "El dispositivo ya está montado en $mount_path."
+        log "INFO" "El dispositivo ya está montado en $mount_path."
     else
         # Intentar montar el dispositivo
         if mount "$mount_path"; then
-            log "Dispositivo montado en $mount_path exitosamente."
+            log "INFO" "Dispositivo montado en $mount_path exitosamente."
         else
-            log "Error al montar $mount_path."
+            log ""ERROR" Error al montar $mount_path."
             continue
         fi
     fi
 done < <(jq -c '.puntos_de_montaje[]' "$CONFIG_FILE")
 
-log "Proceso completado."
+log "INFO" "Proceso completado."
