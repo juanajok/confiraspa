@@ -18,13 +18,6 @@ setup_error_handling      # Habilitar captura de errores
 install_dependencies "wget" "jq"  # Instalar dependencias del sistema
 
 
-# Función de registro para imprimir mensajes con marca de tiempo y nivel de log
-log() {
-    local level="$1"
-    local message="$2"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" | tee -a "$LOG_FILE"
-}
-
 # Verificar si se ejecuta como root
 if [[ $EUID -ne 0 ]]; then
     log "ERROR" "Por favor, ejecuta el script como superusuario (sudo)."
@@ -42,7 +35,6 @@ log "INFO" "El grupo es: $app_guid"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Definir el directorio de configuración relativo al directorio del script
-CONFIG_DIR="$SCRIPT_DIR/configs"
 CREDENTIALS_FILE="$CONFIG_DIR/credenciales.json"
 
 # Verificar si el archivo credenciales.json existe
