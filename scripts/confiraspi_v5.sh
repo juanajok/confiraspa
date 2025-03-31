@@ -15,8 +15,13 @@ set -euo pipefail
 source /opt/confiraspa/lib/utils.sh
 
 check_root
+# --- Crear directorio de logs ANTES de setup_error_handling ---
+LOG_DIR="/opt/confiraspa/logs"
+MAIN_LOG_FILE="$LOG_DIR/confiraspa.log"
+mkdir -p "$LOG_DIR"
+chmod 755 "$LOG_DIR"
 setup_error_handling
-install_dependencies "chmod" "jq" "bash" "apt-get" "sudo" # depenencias
+install_dependencies "jq" "bash" # depenencias
 
 # Variables
 DEFAULT_SCRIPTS_DIR="/opt/confiraspa/scripts"
@@ -86,7 +91,8 @@ main() {
         exit 1
     fi
 
-    # Crear el archivo de log principal si no existe y establecer permisos
+    # Crear directorio de logs y archivo principal con permisos
+
     if [ ! -f "$MAIN_LOG_FILE" ]; then
         touch "$MAIN_LOG_FILE"
         chmod 644 "$MAIN_LOG_FILE"
