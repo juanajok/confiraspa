@@ -7,37 +7,21 @@ scriptversion="4.0.0"
 scriptdate="2023-10-05"
 
 set -euo pipefail
+# --- Cargar Funciones Comunes ---
+source /opt/confiraspa/lib/utils.sh
+# --- Validaciones Iniciales ---
+check_root
+setup_error_handling
+setup_paths
+install_dependencies "jq" "curl" "sqlite3"
 
 # Variables
-SCRIPT_DIR="$(dirname "$(realpath "$0")")"
-CONFIG_DIR="$SCRIPT_DIR/configs"
+
 JSON_FILE="$CONFIG_DIR/arr_user.json"
-LOG_DIR="/var/log/confiraspi_v5"
 INSTALL_DIR="/opt"
 COMMON_PACKAGES=("curl" "sqlite3")
 APPS=("lidarr" "prowlarr" "radarr" "readarr" "whisparr")
 
-# Crear el directorio de logs si no existe
-mkdir -p "$LOG_DIR"
-chmod 755 "$LOG_DIR"
-
-# Definir archivo de log para este script
-SCRIPT_LOG_FILE="$LOG_DIR/install_arr.sh.log"
-
-# Función de registro para imprimir mensajes con marca de tiempo y nivel de log
-log() {
-    local level="$1"
-    local message="$2"
-    printf "[%s] [%s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$message" >> "$SCRIPT_LOG_FILE"
-}
-
-# Función para verificar si se ejecuta como root
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        log "ERROR" "Este script debe ejecutarse con privilegios de superusuario (sudo)."
-        exit 1
-    fi
-}
 
 # Función para verificar y crear usuario y grupo
 setup_user_group() {

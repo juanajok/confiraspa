@@ -1,186 +1,392 @@
 #!/bin/bash
-### Description: Instalación automatizada de Sonarr en Debian
-### Adaptado para leer usuario y grupo desde configs/arr_user.json
-### Versión: 1.2.0
-### Fecha: [Fecha Actual]
+### Descripción: Instalación automatizada e idempotente de Sonarr para Raspberry Pi OS
+### Versión: 2.1.0 (Mejoras en idempotencia, extracción y verificación)
 
-set -euo pipefail
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Carga de biblioteca de utilidades y configuración inicial
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Determinar la ubicación de utils.sh de forma robusta
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+UTILS_LIB_PATH="/opt/confiraspa/lib/utils.sh" # O usa una ruta relativa/descubierta si prefieres
 
-# Función de registro para imprimir mensajes con marca de tiempo y nivel de log
-log() {
-    local level="$1"
-    local message="$2"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message"
+if [[ ! -f "$UTILS_LIB_PATH" ]]; then
+    echo "[ERROR] [$(basename "$0")] Biblioteca de utilidades no encontrada en '$UTILS_LIB_PATH'. Saliendo." >&2
+    exit 1
+fi
+# shellcheck source=/opt/confiraspa/lib/utils.sh
+source "$UTILS_LIB_PATH" || {
+    echo "[ERROR] [$(basename "$0")] Fallo al cargar la biblioteca de utilidades '$UTILS_LIB_PATH'. Saliendo." >&2
+    exit 1
 }
 
-log "INFO" "Iniciando instalación automatizada de Sonarr"
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Configuración global (Manteniendo la estructura original)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+declare -A CONFIG=(
+    [APP_NAME]="sonarr"
+    [INSTALL_DIR]="/opt/sonarr"             # Directorio de instalación de binarios/ejecutables
+    [DATA_DIR]="/var/lib/sonarr"            # Directorio de datos (config.xml, logs, db, etc.)
+    [SERVICE_FILE]="/etc/systemd/system/sonarr.service"
+    [CONFIG_FILE]="/opt/confiraspa/configs/arr_user.json" # Archivo JSON con user/group
+    [PORT]="8989"
+    [UMASK]="0002"                          # Permisos por defecto (rw-rw-r--)
+    # Añadido jq como prerrequisito
+    [PREREQUISITES]="curl sqlite3 wget jq"
+    [ARCH_MAP]="amd64:x64 armhf:arm arm64:arm64" # Mapeo arch de dpkg a Sonarr
+    # Nota: La versión 4 de Sonarr requiere .NET 6 o superior. Asegúrate de que esté instalado
+    # o añade lógica para instalarlo si es necesario (más complejo).
+    # Podrías añadir dotnet-sdk-6.0 o similar a PREREQUISITES si tu OS lo empaqueta.
+    [RELEASE_URL]="https://services.sonarr.tv/v1/download/main/latest?version=4&os=linux"
+    # Nombre esperado del ejecutable principal dentro de INSTALL_DIR
+    [EXECUTABLE_NAME]="Sonarr"
+)
 
-# Verificar si se ejecuta como root
-if [ "$EUID" -ne 0 ]; then
-    log "ERROR" "Este script debe ejecutarse con privilegios de superusuario (sudo)."
-    exit 1
-fi
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Funciones Principales (Refinadas)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-app="sonarr"
-app_port="8989"
-app_prereq="curl sqlite3 wget"
-app_umask="0002"
-branch="main"
+#--- Carga de Configuración de Usuario ---
+load_user_config() {
+    log "INFO" "Cargando configuración de usuario desde ${CONFIG[CONFIG_FILE]}"
 
-# Constantes
-installdir="/opt"
-bindir="${installdir}/${app^}"
-datadir="/var/lib/$app/"
-app_bin=${app^}
+    if [[ ! -f "${CONFIG[CONFIG_FILE]}" ]]; then
+        log "ERROR" "Archivo de configuración de usuario no encontrado: ${CONFIG[CONFIG_FILE]}"
+        return 1 # Usar return en lugar de exit para permitir manejo de errores más granular si es necesario
+    fi
 
-# Verificar que el script no se está ejecutando desde el directorio de instalación
-script_dir="$(dirname -- "$(readlink -f -- "$0")")"
-if [ "$installdir" == "$script_dir" ] || [ "$bindir" == "$script_dir" ]; then
-    log "ERROR" "No debes ejecutar este script desde el directorio de instalación. Por favor, ejecútalo desde otro directorio."
-    exit 1
-fi
+    # Usar jq para extraer valores, con manejo de errores si falla jq o el archivo es inválido
+    local user group
+    user=$(jq -re '.user' "${CONFIG[CONFIG_FILE]}") || { log "ERROR" "Fallo al leer 'user' desde JSON (${CONFIG[CONFIG_FILE]}) o valor inválido."; return 1; }
+    group=$(jq -re '.group' "${CONFIG[CONFIG_FILE]}") || { log "ERROR" "Fallo al leer 'group' desde JSON (${CONFIG[CONFIG_FILE]}) o valor inválido."; return 1; }
 
-# Leer usuario y grupo desde configs/arr_user.json
-config_file="configs/arr_user.json"
+    if [[ -z "$user" || -z "$group" ]]; then
+        log "ERROR" "Configuración incompleta en JSON. Se requieren 'user' y 'group' no vacíos."
+        return 1
+    fi
 
-# Verificar si el archivo JSON existe
-if [ ! -f "$config_file" ]; then
-    log "ERROR" "El archivo de configuración $config_file no se encuentra."
-    exit 1
-fi
+    # Guardar en el array CONFIG si la lectura fue exitosa
+    CONFIG[SERVICE_USER]="$user"
+    CONFIG[SERVICE_GROUP]="$group"
+    log "INFO" "Usuario de servicio configurado como '${CONFIG[SERVICE_USER]}' (Grupo: '${CONFIG[SERVICE_GROUP]}')"
+    return 0
+}
 
-# Verificar si 'jq' está instalado
-if ! command -v jq >/dev/null 2>&1; then
-    log "INFO" "Instalando 'jq' para procesar archivos JSON..."
-    apt-get update
-    apt-get install -y jq
-fi
+#--- Configuración de Usuario/Grupo del Sistema (Idempotente) ---
+setup_system_user() {
+    log "INFO" "Asegurando existencia del usuario y grupo del sistema..."
 
-# Leer usuario y grupo desde el archivo JSON
-app_uid=$(jq -r '.user' "$config_file")
-app_guid=$(jq -r '.group' "$config_file")
+    # Crear grupo si no existe (Idempotente)
+    if ! getent group "${CONFIG[SERVICE_GROUP]}" >/dev/null; then
+        log "INFO" "El grupo '${CONFIG[SERVICE_GROUP]}' no existe. Creándolo..."
+        if ! groupadd --system "${CONFIG[SERVICE_GROUP]}"; then
+            log "ERROR" "Fallo al crear el grupo del sistema '${CONFIG[SERVICE_GROUP]}'."
+            return 1
+        fi
+        log "INFO" "Grupo '${CONFIG[SERVICE_GROUP]}' creado."
+    else
+        log "DEBUG" "El grupo '${CONFIG[SERVICE_GROUP]}' ya existe."
+    fi
 
-# Validar que los valores no estén vacíos
-if [ -z "$app_uid" ] || [ -z "$app_guid" ]; then
-    log "ERROR" "El archivo $config_file no contiene el usuario o grupo."
-    exit 1
-fi
+    # Crear usuario si no existe (Idempotente)
+    if ! id -u "${CONFIG[SERVICE_USER]}" >/dev/null 2>&1; then
+        log "INFO" "El usuario '${CONFIG[SERVICE_USER]}' no existe. Creándolo..."
+        if ! useradd --system --no-create-home \
+                --gid "${CONFIG[SERVICE_GROUP]}" \
+                --shell /usr/sbin/nologin \
+                "${CONFIG[SERVICE_USER]}"; then
+            log "ERROR" "Fallo al crear el usuario del sistema '${CONFIG[SERVICE_USER]}'."
+            return 1
+        fi
+        log "INFO" "Usuario '${CONFIG[SERVICE_USER]}' creado y añadido al grupo '${CONFIG[SERVICE_GROUP]}'."
+    else
+        log "DEBUG" "El usuario '${CONFIG[SERVICE_USER]}' ya existe."
+        # Verificar/Asegurar pertenencia al grupo primario/suplementario si el usuario ya existía
+        if ! groups "${CONFIG[SERVICE_USER]}" | grep -qw "${CONFIG[SERVICE_GROUP]}"; then
+             log "INFO" "Añadiendo usuario '${CONFIG[SERVICE_USER]}' al grupo '${CONFIG[SERVICE_GROUP]}' (suplementario)."
+             usermod -a -G "${CONFIG[SERVICE_GROUP]}" "${CONFIG[SERVICE_USER]}" || {
+                 log "ERROR" "No se pudo añadir el usuario existente '${CONFIG[SERVICE_USER]}' al grupo '${CONFIG[SERVICE_GROUP]}'."
+                 return 1
+             }
+        else
+             log "DEBUG" "Usuario '${CONFIG[SERVICE_USER]}' ya pertenece al grupo '${CONFIG[SERVICE_GROUP]}'."
+        fi
+    fi
 
-log "INFO" "Sonarr se instalará en [$bindir] y usará [$datadir] como directorio de datos"
-log "INFO" "Sonarr se ejecutará como el usuario [$app_uid] y el grupo [$app_guid]"
+    return 0
+}
 
-# Crear usuario y grupo si es necesario
-if ! getent group "$app_guid" >/dev/null; then
-    log "INFO" "Creando grupo [$app_guid]"
-    groupadd "$app_guid"
-fi
+#--- Configuración de Directorios (Idempotente) ---
+configure_directories() {
+    log "INFO" "Configurando directorios y permisos..."
+    local dirs=("${CONFIG[INSTALL_DIR]}" "${CONFIG[DATA_DIR]}")
+    local dir
+    local owner_group="${CONFIG[SERVICE_USER]}:${CONFIG[SERVICE_GROUP]}"
 
-if ! id -u "$app_uid" >/dev/null 2>&1; then
-    log "INFO" "Creando usuario [$app_uid] y agregándolo al grupo [$app_guid]"
-    adduser --system --no-create-home --ingroup "$app_guid" "$app_uid"
-fi
+    for dir in "${dirs[@]}"; do
+        # Crear directorio (idempotente)
+        if ! mkdir -p "$dir"; then
+            log "ERROR" "No se pudo crear o acceder al directorio: $dir (Verifica permisos padres)"
+            return 1
+        fi
 
-if ! id -nG "$app_uid" | grep -qw "$app_guid"; then
-    log "INFO" "Agregando usuario [$app_uid] al grupo [$app_guid]"
-    usermod -a -G "$app_guid" "$app_uid"
-fi
+        # Establecer propietario/grupo (idempotente en efecto, aunque se ejecuta siempre)
+        # Usar -R sólo si es estrictamente necesario y el directorio ya contiene algo que deba heredar.
+        # Para el directorio base, -R no es necesario inicialmente.
+        if ! chown "$owner_group" "$dir"; then
+             log "ERROR" "No se pudo establecer propietario/grupo '$owner_group' en: $dir"
+             return 1
+        fi
 
-# Detener Sonarr si está en ejecución
-if systemctl is-active --quiet "$app"; then
-    log "INFO" "Deteniendo servicio existente de Sonarr"
-    systemctl stop "$app"
-    systemctl disable "$app"
-fi
+        # Establecer permisos (idempotente en efecto)
+        # 775 permite al grupo escribir, útil para DATA_DIR. Para INSTALL_DIR, 755 podría ser suficiente,
+        # pero 775 es coherente con el script original y permite actualizaciones/plugins si Sonarr lo necesita.
+        if ! chmod 775 "$dir"; then
+             log "ERROR" "No se pudieron establecer permisos 775 en: $dir"
+             return 1
+        fi
+        log "DEBUG" "Directorio '$dir' configurado: Propietario=$owner_group, Permisos=775."
+    done
+    return 0
+}
 
-# Crear directorio de datos
-log "INFO" "Creando directorio de datos en [$datadir]"
-mkdir -p "$datadir"
-chown -R "$app_uid":"$app_guid" "$datadir"
-chmod 775 "$datadir"
+#--- Instalación de Sonarr (Mejorada para Idempotencia y Robustez) ---
+install_sonarr() {
+    local sonarr_executable="${CONFIG[INSTALL_DIR]}/${CONFIG[EXECUTABLE_NAME]}"
 
-# Instalar paquetes necesarios
-log "INFO" "Instalando paquetes necesarios"
-apt-get update
-apt-get install -y $app_prereq
+    # --- Verificación de Idempotencia ---
+    if [[ -x "$sonarr_executable" ]]; then
+        # Podrías añadir una comprobación de versión aquí si quieres implementar actualizaciones
+        local current_version
+        current_version=$("$sonarr_executable" --version 2>/dev/null || echo "desconocida") # Asumiendo que Sonarr tiene una opción de versión
+        log "INFO" "Sonarr ya parece estar instalado en '$sonarr_executable' (Versión: $current_version). Saltando descarga y extracción."
+        # Asegurar permisos correctos incluso si ya existe
+        log "INFO" "Asegurando permisos correctos en ${CONFIG[INSTALL_DIR]}..."
+        chown -R "${CONFIG[SERVICE_USER]}":"${CONFIG[SERVICE_GROUP]}" "${CONFIG[INSTALL_DIR]}" || log "WARN" "No se pudieron re-aplicar permisos en ${CONFIG[INSTALL_DIR]}"
+        chmod -R u+rwX,g+rwX,o+rX,o-w "${CONFIG[INSTALL_DIR]}" || log "WARN" "No se pudieron re-aplicar permisos en ${CONFIG[INSTALL_DIR]}" # Equivalente a 775 para directorios, 664/775 para archivos
+        return 0
+    fi
 
-# Obtener la arquitectura del sistema
-ARCH=$(dpkg --print-architecture)
+    log "INFO" "Procediendo con la instalación de Sonarr..."
 
-# Construir la URL de descarga
-dlbase="https://services.sonarr.tv/v1/download/$branch/latest?version=4&os=linux"
-case "$ARCH" in
-"amd64") DLURL="${dlbase}&arch=x64" ;;
-"armhf") DLURL="${dlbase}&arch=arm" ;;
-"arm64") DLURL="${dlbase}&arch=arm64" ;;
-*)
-    log "ERROR" "Arquitectura no soportada: $ARCH"
-    exit 1
-    ;;
-esac
+    # --- Detección de Arquitectura ---
+    log "INFO" "Detectando arquitectura del sistema..."
+    local arch dl_arch
+    arch=$(dpkg --print-architecture)
+    # Usar un case es más legible y seguro que tr/grep/cut
+    case "$arch" in
+        amd64) dl_arch="x64" ;;
+        armhf) dl_arch="arm" ;;
+        arm64) dl_arch="arm64" ;;
+        *) log "ERROR" "Arquitectura no soportada por este script: $arch"; return 1 ;;
+    esac
+    log "INFO" "Arquitectura detectada: $arch (Mapeada a: $dl_arch para Sonarr)"
 
-# Descarga e instalación de Sonarr
-log "INFO" "Descargando Sonarr desde $DLURL"
-temp_dir=$(mktemp -d)
-wget --content-disposition "$DLURL" -P "$temp_dir"
+    # --- Descarga Segura ---
+    local dl_url="${CONFIG[RELEASE_URL]}&arch=$dl_arch"
+    local temp_file
+    # Crear archivo temporal de forma segura
+    temp_file=$(mktemp --suffix=.tar.gz) || { log "ERROR" "No se pudo crear archivo temporal."; return 1; }
+    # Usar download_secure de utils.sh
+    log "INFO" "Descargando Sonarr ($dl_arch) desde: $dl_url"
+    if ! download_secure "$dl_url" "$temp_file"; then
+        log "ERROR" "Fallo en la descarga de Sonarr."
+        rm -f "$temp_file" # Limpiar archivo temporal
+        return 1
+    fi
 
-log "INFO" "Extrayendo archivos"
-tar -xzf "$temp_dir"/${app^}.*.tar.gz -C "$temp_dir"
+    # --- Extracción Controlada ---
+    log "INFO" "Extrayendo archivos a ${CONFIG[INSTALL_DIR]}..."
+    # Asegurar que el directorio de instalación existe (debería haber sido creado por configure_directories)
+    mkdir -p "${CONFIG[INSTALL_DIR]}" || { log "ERROR" "No se pudo asegurar la existencia del directorio de instalación: ${CONFIG[INSTALL_DIR]}"; rm -f "$temp_file"; return 1; }
 
-# Realizar copia de seguridad si existe una instalación previa
-if [ -d "$bindir" ]; then
-    log "INFO" "Realizando copia de seguridad de la instalación existente"
-    mv "$bindir" "${bindir}_backup_$(date +%Y%m%d%H%M%S)"
-fi
+    # Extraer contenido directamente en INSTALL_DIR, eliminando el directorio raíz del tarball (asume que es 'Sonarr/')
+    # El --strip-components=1 elimina el primer nivel de directorio dentro del archivo tar.gz
+    if ! tar -xzf "$temp_file" --strip-components=1 -C "${CONFIG[INSTALL_DIR]}"; then
+        log "ERROR" "Error al extraer los archivos de Sonarr a ${CONFIG[INSTALL_DIR]}"
+        rm -f "$temp_file"
+        # Podríamos intentar limpiar ${CONFIG[INSTALL_DIR]} si falló la extracción
+        # find "${CONFIG[INSTALL_DIR]}" -mindepth 1 -delete
+        return 1
+    fi
 
-# Instalar Sonarr
-log "INFO" "Instalando Sonarr en [$bindir]"
-mv "$temp_dir/${app^}" "$installdir"
-chown -R "$app_uid":"$app_guid" "$bindir"
-chmod 775 "$bindir"
+    log "INFO" "Archivos extraídos correctamente."
+    rm -f "$temp_file" # Limpiar archivo temporal
 
-# Limpiar archivos temporales
-rm -rf "$temp_dir"
+    # --- Establecer Permisos Post-Extracción ---
+    log "INFO" "Estableciendo propietario y permisos en ${CONFIG[INSTALL_DIR]}..."
+    if ! chown -R "${CONFIG[SERVICE_USER]}":"${CONFIG[SERVICE_GROUP]}" "${CONFIG[INSTALL_DIR]}"; then
+         log "ERROR" "Fallo al establecer propietario/grupo en ${CONFIG[INSTALL_DIR]}"
+         return 1
+    fi
+    # Ajustar permisos después de la extracción (asegurar ejecución, etc.)
+    # ug=rwX asegura lectura/escritura/ejecución(directorios) para user/group
+    # o=rX asegura lectura/ejecución(directorios) para otros
+    # o-w quita escritura para otros
+    if ! chmod -R u=rwX,g=rwX,o=rX,o-w "${CONFIG[INSTALL_DIR]}"; then
+         log "ERROR" "Fallo al establecer permisos en ${CONFIG[INSTALL_DIR]}"
+         return 1
+    fi
 
-# Crear archivo de servicio systemd
-service_file="/etc/systemd/system/$app.service"
-log "INFO" "Creando archivo de servicio systemd en [$service_file]"
+    log "INFO" "Instalación de Sonarr completada en ${CONFIG[INSTALL_DIR]}"
+    return 0
+}
 
-cat <<EOF > "$service_file"
+#--- Configuración del Servicio Systemd (Idempotente en efecto) ---
+configure_service() {
+    log "INFO" "Configurando el servicio systemd para Sonarr..."
+
+    # Usar create_backup de utils.sh antes de sobrescribir
+    if ! create_backup "${CONFIG[SERVICE_FILE]}"; then
+        log "WARN" "No se pudo crear un backup de ${CONFIG[SERVICE_FILE]}. Continuando..."
+        # No retornar 1 aquí, ya que podría ser la primera ejecución
+    fi
+
+    # Crear/Sobrescribir el archivo de servicio
+    # Asegurarse que ExecStart apunta al ejecutable correcto dentro de INSTALL_DIR
+    local exec_start="${CONFIG[INSTALL_DIR]}/${CONFIG[EXECUTABLE_NAME]}"
+    local data_dir_param="-data=${CONFIG[DATA_DIR]}"
+
+    # Usar cat con EOF para crear el archivo de servicio
+    cat > "${CONFIG[SERVICE_FILE]}" <<EOF
 [Unit]
-Description=${app^} Daemon
-After=network.target
+Description=Sonarr Daemon (Managed by Confiraspa)
+After=syslog.target network-online.target
+Wants=network-online.target
 
 [Service]
-User=$app_uid
-Group=$app_guid
-UMask=$app_umask
+User=${CONFIG[SERVICE_USER]}
+Group=${CONFIG[SERVICE_GROUP]}
+UMask=${CONFIG[UMASK]}          # Asegura permisos de archivos creados por Sonarr
 Type=simple
-ExecStart=$bindir/$app_bin -nobrowser -data=$datadir
+# Ejecutar Sonarr sin abrir navegador y especificando el directorio de datos
+ExecStart=${exec_start} -nobrowser ${data_dir_param}
 TimeoutStopSec=20
 KillMode=process
 Restart=on-failure
+# Opcional: Limitar recursos si es necesario en una RPi
+# CPUWeight=100
+# MemoryMax=1G # Ajustar según la RPi
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Recargar systemd y habilitar el servicio
-log "INFO" "Habilitando e iniciando el servicio de Sonarr"
-systemctl daemon-reload
-systemctl enable --now "$app"
+    # Verificar si el archivo se creó/modificó
+    if [[ ! -f "${CONFIG[SERVICE_FILE]}" ]]; then
+        log "ERROR" "Fallo al crear el archivo de servicio: ${CONFIG[SERVICE_FILE]}"
+        return 1
+    fi
+    # Establecer permisos recomendados para archivos de servicio
+    chmod 644 "${CONFIG[SERVICE_FILE]}"
 
-# Verificar el estado del servicio
-sleep 10
-if systemctl is-active --quiet "$app"; then
-    host=$(hostname -I | awk '{print $1}')
-    log "INFO" "Sonarr instalado y ejecutándose correctamente"
-    log "INFO" "Accede a la interfaz web en http://$host:$app_port"
-else
-    log "ERROR" "Sonarr no se está ejecutando correctamente"
-    systemctl status "$app"
-    exit 1
-fi
+    log "INFO" "Recargando configuración de systemd (daemon-reload)..."
+    if ! systemctl daemon-reload; then
+        log "ERROR" "Fallo al ejecutar systemctl daemon-reload."
+        return 1
+    fi
 
-exit 0
+    log "INFO" "Habilitando e iniciando el servicio Sonarr (enable --now)..."
+    # enable --now es idempotente (habilita si no lo está, inicia si no lo está)
+    if ! systemctl enable --now "${CONFIG[APP_NAME]}.service"; then
+        log "ERROR" "Fallo al habilitar o iniciar el servicio ${CONFIG[APP_NAME]}."
+        # Mostrar logs del servicio para diagnóstico
+        log "INFO" "Mostrando últimos logs del servicio ${CONFIG[APP_NAME]}..."
+        journalctl -u "${CONFIG[APP_NAME]}" -n 20 --no-pager
+        return 1
+    fi
 
+    log "INFO" "Servicio ${CONFIG[APP_NAME]} configurado, habilitado e iniciado."
+    return 0
+}
 
+#--- Verificación de la Instalación (Mejorada) ---
+verify_installation() {
+    log "INFO" "Verificando estado del servicio Sonarr..."
+
+    # Esperar un momento para que el servicio termine de iniciar
+    sleep 5
+
+    if ! systemctl is-active --quiet "${CONFIG[APP_NAME]}.service"; then
+        log "ERROR" "El servicio ${CONFIG[APP_NAME]} no está activo después del inicio."
+        log "INFO" "Mostrando estado detallado del servicio..."
+        systemctl status "${CONFIG[APP_NAME]}.service" --no-pager
+        log "INFO" "Mostrando últimos logs del servicio ${CONFIG[APP_NAME]}..."
+        journalctl -u "${CONFIG[APP_NAME]}" -n 50 --no-pager
+        return 1
+    fi
+
+    log "INFO" "Servicio ${CONFIG[APP_NAME]} está activo."
+
+    # Verificación adicional: intentar conectar al puerto localmente
+    local local_url="http://127.0.0.1:${CONFIG[PORT]}"
+    log "INFO" "Intentando conectar a la interfaz web localmente en ${local_url}..."
+    # Usar curl con --fail para retornar error si HTTP status >= 400, --silent para no mostrar salida, --max-time corto
+    if ! curl --fail --silent --max-time 10 "$local_url" > /dev/null; then
+         log "WARN" "No se pudo conectar a $local_url. El servicio podría estar tardando en responder o haber un problema de configuración interno de Sonarr."
+         log "WARN" "A pesar de esto, el servicio systemd está reportado como activo."
+         # No retornamos error aquí, ya que el servicio *está* activo según systemd.
+    else
+         log "INFO" "Conexión local a $local_url exitosa."
+    fi
+
+    # Obtener IP para mensaje final usando la función de utils.sh
+    local ip_address
+    ip_address=$(get_ip_address) || ip_address="<IP no detectada>"
+
+    log "SUCCESS" "Instalación y configuración de Sonarr completadas."
+    log "INFO" "Puedes acceder a la interfaz web en: http://${ip_address}:${CONFIG[PORT]}"
+    log "INFO" "Usuario/Grupo de ejecución: ${CONFIG[SERVICE_USER]}/${CONFIG[SERVICE_GROUP]}"
+    log "INFO" "Directorio de instalación: ${CONFIG[INSTALL_DIR]}"
+    log "INFO" "Directorio de datos: ${CONFIG[DATA_DIR]}"
+    return 0
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Flujo Principal del Script (main)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+main() {
+    # --- Configuración Inicial Esencial ---
+    # setup_error_handling y setup_paths son llamados por utils.sh al ser sourced si está bien diseñado,
+    # o necesitan ser llamados explícitamente si no. Asumiendo que setup_paths es llamado por utils.sh
+    # y setup_error_handling también (o se llama aquí).
+    setup_error_handling # Asegurar que se llama
+
+    log "INFO" "== Iniciando script de instalación/configuración de Sonarr =="
+
+    # Verificar si se ejecuta como root
+    check_root || exit 1 # Usar exit 1 si las funciones de utils retornan > 0 en fallo
+
+    # Verificar conectividad básica (opcional, pero bueno antes de instalar deps)
+    check_network_connectivity # No salir si falla, sólo advertir
+
+    # --- Carga de Configuración Específica ---
+    load_user_config || exit 1
+
+    # --- Preparación del Sistema ---
+    setup_system_user || exit 1
+    configure_directories || exit 1
+
+    # --- Instalación de Dependencias ---
+    # install_dependencies de utils.sh maneja la idempotencia
+    log "INFO" "Instalando dependencias necesarias..."
+    install_dependencies curl sqlite3 wget jq || exit 1
+    # Considerar añadir .NET SDK/Runtime aquí si es necesario para Sonarr v4+
+
+    # --- Instalación de la Aplicación ---
+    install_sonarr || exit 1
+
+    # --- Configuración del Servicio ---
+    configure_service || exit 1
+
+    # --- Verificación Final ---
+    verify_installation || exit 1 # Salir si la verificación crucial falla
+
+    log "INFO" "== Script de Sonarr finalizado con éxito =="
+    exit 0
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Ejecución del Script
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Pasar todos los argumentos recibidos por el script a la función main
+main "$@"

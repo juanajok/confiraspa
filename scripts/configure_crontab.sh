@@ -11,7 +11,7 @@ setup_paths
 
 # --- Procesar Configuración ---
 log "INFO" "Cargando configuración de crontab..."
-CONFIG_FILE="${CONFIG_DIR}/crontab_jobs.json" 
+CONFIG_FILE="${CONFIG_DIR}/scripts_and_crontab.json" 
 
 # Validar existencia de archivo
 [ -f "$CONFIG_FILE" ] || {

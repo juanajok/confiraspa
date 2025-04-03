@@ -1,115 +1,237 @@
-Confiraspa:
-Automatiza la reinstalación y configuración de una Raspberry Pi con diversas aplicaciones y servicios.
+# Confiraspa 🚀
 
-Índice
-Descripción
-Características
-Requisitos previos
-Instalación
-Uso
-Dependencias
-Contribuciones
-Licencia
+**Automatiza la instalación, configuración y gestión de servicios en tu Raspberry Pi.**
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+<!-- Opcional: Añadir otros badges si aplican (ej. versión, build status) -->
 
-Descripción
-============
-Confiraspa es un script de shell que automatiza la configuración de una Raspberry Pi, realizando tareas como la actualización del sistema, configuración de IP estática e instalación y configuración de varios servicios y aplicaciones. El objetivo del proyecto es facilitar y agilizar el proceso de preparación de una Raspberry Pi para diversos usos.
+---
 
-Características
-===============
+## Índice
 
-El script realiza las siguientes tareas:
+*   [Descripción](#descripción-)
+*   [Filosofía y Objetivos](#filosofía-y-objetivos-)
+*   [Características Principales](#características-principales-)
+*   [Arquitectura del Proyecto](#arquitectura-del-proyecto-)
+*   [Software Instalado](#software-instalado-)
+*   [Requisitos Previos](#requisitos-previos-)
+*   [Instalación](#instalación-)
+*   [Configuración](#configuración-️)
+*   [Uso](#uso-)
+*   [Contribuciones](#contribuciones-)
+*   [Licencia](#licencia-)
 
-Actualización del sistema: Mantiene la Raspberry Pi actualizada.
+---
 
-Configuración de IP estática: Establece una dirección IP fija para la Raspberry Pi.
+## Descripción 📖
 
-Instalación y configuración de servicios y aplicaciones, incluyendo:
+Confiraspa es un conjunto de scripts de shell diseñados para **automatizar la configuración inicial y la instalación de servicios comunes en una Raspberry Pi** (especialmente con Raspberry Pi OS). Simplifica drásticamente el proceso de convertir una instalación limpia del sistema operativo en un servidor doméstico funcional (por ejemplo, para gestión multimedia, descargas, compartición de archivos y administración remota).
 
-Samba: Permite compartir archivos y directorios a través de una red local.
-XRDP: Habilita el acceso remoto al escritorio de la Raspberry Pi.
-Transmission: Cliente BitTorrent para descargar y compartir archivos.
-Mono: Entorno de desarrollo para ejecutar aplicaciones basadas en .NET.
-Sonarr: Gestiona automáticamente tus series de TV y descarga nuevos episodios.
-Webmin: Herramienta de administración de sistemas basada en web para Linux.
-VNC: Permite el control remoto gráfico de la Raspberry Pi.
-Plex: Servidor multimedia para organizar y transmitir películas, series de TV y música.
-Bazarr: Descarga automática de subtítulos para tus series y películas.
-aMule: Cliente P2P para compartir archivos a través de las redes eD2k y Kademlia.
-Rclone: Sincroniza archivos y directorios con servicios de almacenamiento en la nube.
+El proyecto nace de la necesidad de tener un método **repetible, consistente y rápido** para configurar una Raspberry Pi, evitando tareas manuales tediosas y propensas a errores.
 
-Requisitos previos
-==================
-Hardware: Una Raspberry Pi con una distribución basada en Debian (por ejemplo, Raspberry Pi OS).
-Acceso: Acceso a una terminal o línea de comandos en la Raspberry Pi.
-Conexión a Internet: Para descargar paquetes y dependencias.
+---
 
-Instalación
-===========
-Clonar el repositorio
+## Filosofía y Objetivos 🎯
 
-Clone este repositorio en su Raspberry Pi (recomendado en /opt/confiraspa):
+*   **Automatización:** Reducir al mínimo la intervención manual.
+*   **Idempotencia:** Poder ejecutar los scripts múltiples veces sin efectos secundarios negativos (los servicios ya instalados no se reinstalan innecesariamente).
+*   **Modularidad:** Scripts separados para cada aplicación principal, facilitando el mantenimiento y la personalización.
+*   **Configurabilidad:** Uso de archivos de configuración externos (JSON) para parámetros clave (red, credenciales, usuarios, montajes).
+*   **Buenas Prácticas:** Seguir principios de scripting robusto (manejo de errores, logging, uso de librerías comunes).
+*   **Facilidad de Uso:** Un script principal orquesta la ejecución, pero los scripts individuales pueden usarse para depuración o instalación selectiva.
 
+---
 
-sudo mkdir -p /opt/confiraspa
-sudo git clone https://github.com/juanajok/confiraspa /opt/confiraspa
-Navegar al directorio del repositorio
+## Características Principales ✨
 
+*   **Actualización del Sistema:** Ejecuta `apt update` y `apt upgrade` iniciales.
+*   **Configuración de Red:** Establece una dirección IP estática basada en `ip_config.json`.
+*   **Instalación y Configuración Modular de Servicios:**
+    *   Instala dependencias necesarias del sistema.
+    *   Crea usuarios y grupos de sistema si es necesario (configurable).
+    *   Configura directorios de datos y permisos.
+    *   Descarga/instala las aplicaciones.
+    *   Configura y habilita servicios `systemd` para cada aplicación.
+    *   Utiliza entornos virtuales Python (`venv`) cuando es apropiado (ej. Bazarr).
+*   **Logging:** Registros detallados en `logs/` para el script principal y cada sub-script.
+*   **Utilidades Compartidas:** Una librería (`lib/utils.sh`) proporciona funciones comunes para logging, manejo de errores, instalación de dependencias, etc.
 
-cd /opt/confiraspa
-Asegurar permisos de ejecución
+---
 
-Haga que el script confiraspi.sh sea ejecutable:
+## Arquitectura del Proyecto 🏗️
 
+Confiraspa está estructurado de la siguiente manera:
 
-sudo chmod +x confiraspi.sh
-Uso
-Antes de ejecutar el script, es necesario configurar algunos archivos:
+*   `/opt/confiraspa/` (Directorio raíz recomendado)
+    *   `confiraspi_v5.sh`: Script principal que orquesta la ejecución de otros scripts.
+    *   `scripts/`: Contiene los scripts de instalación individuales para cada aplicación (ej. `install_sonarr.sh`, `install_bazarr.sh`).
+    *   `lib/`: Contiene librerías de shell compartidas.
+        *   `utils.sh`: Funciones comunes de utilidad (logging, dependencias, etc.).
+    *   `configs/`: **Archivos de configuración que DEBES editar.**
+        *   `ip_config.json`: Configuración de red estática.
+        *   `credenciales.json`: Contraseñas (¡manejar con cuidado!).
+        *   `arr_user.json`: Usuario y grupo para ejecutar los servicios \*Arr (Sonarr, Radarr, Bazarr...).
+        *   `puntos_de_montaje.json`: Puntos de montaje para discos externos.
+    *   `logs/`: Directorio donde se generan los archivos de log.
+    *   `README.md`: Este archivo.
+    *   `LICENSE`: Licencia del proyecto.
 
-Editar archivos de configuración
+---
 
-Configuración de red: Edite el archivo ip_config.json en el directorio del repositorio:
+## Software Instalado 📦
 
+Confiraspa puede instalar y configurar (según esté implementado en `confiraspi_v5.sh`) los siguientes paquetes y servicios:
 
-{
-  "interface": "eth0",
-  "ip_address": "192.168.1.100/24",
-  "routers": "192.168.1.1",
-  "domain_name_servers": "8.8.8.8 8.8.4.4"
-}
-Ajuste los valores según su configuración de red.
+*   **Compartición de Archivos:**
+    *   `samba`: Para compartir archivos en la red local (SMB/CIFS).
+*   **Acceso Remoto:**
+    *   `xrdp`: Servidor RDP para acceso gráfico remoto.
+    *   *VNC* (Configuración manual o a través de otro script puede ser necesaria dependiendo del método).
+*   **Descargas:**
+    *   `transmission-daemon`: Cliente BitTorrent ligero.
+    *   `amule-daemon`: Cliente eD2k/Kademlia.
+*   **Gestión Multimedia (\*Arr Suite):**
+    *   `mono-runtime`: Dependencia para Sonarr v3 (Sonarr v4 usa .NET).
+    *   `dotnet-sdk` / `dotnet-runtime`: Dependencia para aplicaciones .NET (como Sonarr v4+). *(Nota: La instalación de .NET puede variar)*.
+    *   `sonarr`: Gestión y descarga automatizada de series de TV.
+    *   `radarr`: Gestión y descarga automatizada de películas. *(No mencionado explícitamente en el original, pero es hermano de Sonarr/Bazarr)*
+    *   `bazarr`: Gestión y descarga automatizada de subtítulos.
+    *   `plexmediaserver`: Servidor multimedia para organizar y transmitir contenido.
+*   **Administración:**
+    *   `webmin`: Interfaz web para administración del sistema.
+*   **Utilidades:**
+    *   `rclone`: Sincronización con servicios de almacenamiento en la nube.
+    *   `jq`: Procesador JSON (usado por los scripts).
+    *   `git`: Sistema de control de versiones (usado para clonar Confiraspa y algunas apps).
+    *   Otras dependencias necesarias para las aplicaciones anteriores (`curl`, `wget`, `python3-pip`, `python3-venv`, librerías de desarrollo, etc.).
 
-Credenciales: Edite el archivo credenciales.json:
+---
 
+## Requisitos Previos 📝
 
-{
-  "password": "tu_contraseña"
-}
+*   **Hardware:** Una Raspberry Pi (probado principalmente en RPi 4/5, pero debería funcionar en otras con suficiente RAM/CPU).
+*   **Sistema Operativo:** Raspberry Pi OS (basado en Debian Bullseye o Bookworm). Otras distribuciones basadas en Debian *podrían* funcionar con ajustes.
+*   **Acceso:** Acceso a la terminal con privilegios `sudo`.
+*   **Conexión a Internet:** Necesaria para descargar el repositorio, paquetes del sistema y aplicaciones.
+*   **Herramientas Esenciales:** **Debes** tener `git` y `jq` instalados *antes* de ejecutar Confiraspa. Instálalos si no los tienes:
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y git jq
+    ```
 
+---
 
-Nota: La aplicación aMule utilizará el usuario con el que ejecute el script y la contraseña proporcionada en este archivo. Es recomendable editar este archivo justo antes de la ejecución y eliminarlo o modificarlo después por motivos de seguridad.
+## Instalación 🛠️
 
-Puntos de montaje: Edite el archivo puntos_de_montaje.json y añada los puntos de montaje de los discos duros asociados.
+1.  **Clonar el Repositorio:** Se recomienda usar `/opt/confiraspa`.
+    ```bash
+    # Crear directorio padre (si no existe)
+    sudo mkdir -p /opt/confiraspa
+    # Clonar
+    sudo git clone https://github.com/juanajok/confiraspa /opt/confiraspa
+    ```
+2.  **Navegar al Directorio:**
+    ```bash
+    cd /opt/confiraspa
+    ```
+3.  **Verificar Permisos (Opcional):** `git clone` normalmente preserva los permisos, pero puedes asegurarte de que los scripts sean ejecutables si es necesario (aunque se ejecutan con `bash`):
+    ```bash
+    # Ejemplo: asegurar permisos en el script principal
+    # sudo chmod +x confiraspi_v5.sh
+    # sudo chmod +x scripts/*.sh
+    ```
 
-Ejecutar el script
+---
 
+## Configuración ✏️
 
-sudo bash ./confiraspi_v5.sh
-Siga las instrucciones en pantalla y espere a que se complete la ejecución del script.
+**¡Este es el paso más importante antes de ejecutar!** Debes editar los archivos JSON dentro del directorio `configs/`.
 
-Dependencias
-===============
+1.  **Configuración de Red (`configs/ip_config.json`):**
+    Define la IP estática deseada para tu Raspberry Pi.
+    ```json
+    {
+      "interface": "eth0",  # O wlan0 para WiFi
+      "ip_address": "192.168.1.100/24", # IP deseada y máscara (formato CIDR)
+      "routers": "192.168.1.1", # IP de tu puerta de enlace (router)
+      "domain_name_servers": "8.8.8.8 8.8.4.4" # Servidores DNS (separados por espacio)
+    }
+    ```
+2.  **Credenciales (`configs/credenciales.json`):**
+    Contiene contraseñas usadas por algunas aplicaciones.
+    ```json
+    {
+      "password": "tu_contraseña_segura"
+    }
+    ```
+    *   **⚠️ ¡ADVERTENCIA DE SEGURIDAD! ⚠️** Este archivo contiene contraseñas en texto plano.
+        *   **Edítalo justo antes de ejecutar el script.**
+        *   **Utiliza contraseñas fuertes y únicas.**
+        *   **Considera eliminar o vaciar este archivo después de la ejecución.** (Algunas aplicaciones podrían necesitar la contraseña de nuevo si se reconfiguran).
+    *   Actualmente, se menciona que aMule usa esta contraseña y el usuario que ejecuta el script. Verifica si otras aplicaciones también la usan.
+3.  **Usuario/Grupo \*Arr (`configs/arr_user.json`):**
+    Define el usuario y grupo bajo el cual se ejecutarán Sonarr, Radarr, Bazarr, etc. Esto es importante para la gestión de permisos de archivos multimedia.
+    ```json
+    {
+      "user": "pi",  # Usuario deseado (ej. 'pi' o un usuario dedicado como 'media')
+      "group": "pi"  # Grupo deseado (ej. 'pi' o 'media')
+    }
+    ```
+    *   El script intentará crear este usuario/grupo como usuario de sistema (`--system`) si no existen.
+    *   Asegúrate de que este usuario/grupo tenga los permisos adecuados en tus directorios de descargas y multimedia.
+4.  **Puntos de Montaje (`configs/puntos_de_montaje.json`):**
+    Define cómo montar discos duros externos. Adapta la estructura según necesite el script que lo use (ej. para configurar Samba o las rutas en \*Arr). *(El formato exacto puede depender de cómo lo use `confiraspi_v5.sh`)*.
+    ```json
+    // Ejemplo de posible estructura (¡Verifica cómo lo usa tu script!)
+    [
+      {
+        "device": "/dev/sda1",
+        "mount_point": "/mnt/disco1",
+        "filesystem": "ext4", // o ntfs, exfat, etc.
+        "options": "defaults,nofail"
+      },
+      {
+        "device": "/dev/disk/by-uuid/TU_UUID_AQUI", // Método más robusto
+        "mount_point": "/mnt/disco2",
+        "filesystem": "ext4",
+        "options": "defaults,nofail"
+      }
+    ]
+    ```
 
-El script confiraspi.sh se encargará de instalar y configurar los paquetes y servicios necesarios en su Raspberry Pi, como se mencionó en la sección de características.
+---
 
-Nota: Asegúrese de que su sistema tiene instalados los paquetes git y jq. Si no los tiene, puede instalarlos con:
+## Uso ▶️
 
+1.  **Asegúrate de haber editado los archivos en `configs/` correctamente.**
+2.  **Ejecuta el script principal como root:**
+    ```bash
+    cd /opt/confiraspa
+    sudo bash ./confiraspi_v5.sh
+    ```
+3.  **Sigue las Instrucciones:** El script puede pedir confirmaciones o mostrar información durante la ejecución.
+4.  **Ten Paciencia:** La ejecución completa puede tardar bastante tiempo, especialmente la primera vez, debido a las actualizaciones del sistema y la descarga/instalación de paquetes.
+5.  **Revisa los Logs:** Si algo falla, revisa los archivos en el directorio `logs/` para obtener detalles.
 
-sudo apt-get update
-sudo apt-get install -y git jq
-Contribuciones
-Las contribuciones son bienvenidas. Siéntase libre de abrir issues o enviar pull requests para mejorar el script o agregar nuevas funciones.
+*   **Ejecución de Scripts Individuales:** Para depuración o instalación selectiva, puedes ejecutar los scripts dentro del directorio `scripts/` (también generalmente con `sudo bash scripts/nombre_script.sh`), pero ten en cuenta que pueden depender de configuraciones o pasos realizados por el script principal o por `utils.sh`.
 
-Licencia
-Este proyecto está licenciado bajo la Licencia GNU General Public License v3.0. Para más información, consulte el archivo LICENSE en el repositorio.
+---
+
+## Contribuciones 🤝
+
+¡Las contribuciones son bienvenidas! Si encuentras errores, tienes sugerencias de mejora o quieres añadir soporte para nuevas aplicaciones:
+
+1.  **Revisa los Issues:** Mira si tu idea o problema ya está reportado.
+2.  **Abre un Issue:** Describe claramente el problema o la propuesta de mejora.
+3.  **Crea un Fork:** Haz un fork del repositorio.
+4.  **Crea una Rama:** `git checkout -b mi-nueva-feature`
+5.  **Haz tus Cambios:** Intenta seguir el estilo y la estructura existentes (modularidad, uso de `utils.sh`).
+6.  **Haz Commit:** `git commit -m 'Añade nueva feature'`
+7.  **Haz Push:** `git push origin mi-nueva-feature`
+8.  **Abre un Pull Request:** Describe tus cambios detalladamente.
+
+---
+
+## Licencia 📜
+
+Este proyecto está licenciado bajo la Licencia Pública General GNU v3.0. Consulta el archivo `LICENSE` para más detalles.
