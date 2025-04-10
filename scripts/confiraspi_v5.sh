@@ -72,15 +72,6 @@ usage() {
     exit 1
 }
 
-track_progress() {
-    local current="$1"
-    local total="$2"
-    local script_name="$3"
-    local percentage=$((current * 100 / total))
-    
-    log "INFO" "Progreso: [$percentage%] ($current/$total) - Ejecutando: $script_name"
-}
-
 # Función principal que coordina la ejecución de los scripts
 main() {
     # Verificar si se pasó un argumento para el directorio de scripts
