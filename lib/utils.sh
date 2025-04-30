@@ -263,8 +263,7 @@ restore_backup() {
 download_secure() {
     local url="$1"
     local output="$2"
-    local expected_sha256="$3"
-
+    local expected_sha256="${3:-}" # Si $3 no está definido o es nulo, usa una cadena vacía ""
     log "INFO" "Descargando archivo desde: $url"
     log "DEBUG" "Guardando en: $output"
 
